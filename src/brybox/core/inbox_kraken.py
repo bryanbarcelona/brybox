@@ -280,17 +280,22 @@ def classify(meta: Meta, rules: List[Dict[str, Any]]) -> Tag:
 
 # ---------- HANDLERS ----------
 
-def delete_handler(meta: Meta, mail: imaplib.IMAP4_SSL, _save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
-    try:
-        _delete(meta.uid, mail)
-    except NotImplementedError as e:
-        logger.warning("UID %s | DELETE-SKIPPED | %s", meta.uid, e)
-    else:
-        log_and_display(
-            f"UID {meta.uid} | DELETED | {meta.sender} | '{meta.subject}'"
-        )
+def delete_handler(meta: Meta, mail: imaplib.IMAP4_SSL, _save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None, dry_run: bool = True) -> None:
+    if dry_run:
+        log_and_display(f"UID {meta.uid} | DRY-RUN | DELETE | skipped")
+        return
 
-def download_pdf_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
+    # TODO: uncomment _delete body when ready for production
+    _delete(meta.uid, mail)
+    log_and_display(
+        f"UID {meta.uid} | DELETED | {meta.sender} | '{meta.subject}'"
+    )
+
+def download_pdf_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None, dry_run: bool = True) -> None:
+    if dry_run:
+        log_and_display(f"UID {meta.uid} | DRY-RUN | DOWNLOAD-PDF | skipped")
+        return
+    
     assert meta.invoice_link
     r = requests.get(meta.invoice_link, timeout=30)
     r.raise_for_status()
@@ -300,7 +305,10 @@ def download_pdf_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional
     log_and_display(f"UID {meta.uid} | DOWNLOAD | Downloaded PDF from {meta.invoice_link} to {fname}")
     delete_handler(meta, mail)
 
-def download_attachment_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
+def download_attachment_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None, dry_run: bool = True) -> None:
+    if dry_run:
+        log_and_display(f"UID {meta.uid} | DRY-RUN | DOWNLOAD-ATTACH | skipped")
+        return
     typ, data = mail.uid('FETCH', str(meta.uid).encode(), '(RFC822)')
     raw = data[0][1]
     msg = email.message_from_bytes(raw)
@@ -319,13 +327,21 @@ def download_attachment_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: O
     if downloaded_any:
         delete_handler(meta, mail)
 
-def download_audio_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
+def download_audio_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None, dry_run: bool = True) -> None:
     """Handler to download Dropbox audio files and update meta."""
+    if dry_run:
+        log_and_display(f"UID {meta.uid} | DRY-RUN | DOWNLOAD-AUDIO | skipped")
+        return
+
     audio_files = download_dropbox_audio(meta.body_html, save_dir=save_dir)
     meta.audio_files = audio_files  # Assuming Meta can store audio_files
 
-def download_techem_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, web_credentials: Optional[WebCredentials] = None) -> None:
+def download_techem_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, web_credentials: Optional[WebCredentials] = None, dry_run: bool = True) -> None:
     """Handler to download Techem invoices using Playwright automation."""
+    if dry_run:
+        log_and_display(f"UID {meta.uid} | DRY-RUN | TECHEM-DOWNLOAD | skipped")
+        return
+
     try:       
         success = download_techem_invoice(
             user=web_credentials.techem_user,
@@ -343,8 +359,12 @@ def download_techem_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optio
     except Exception as e:
         log_and_display(f"UID {meta.uid} | TECHEM_ERROR | Error downloading Techem invoice: {e}")
 
-def download_kfw_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, web_credentials: Optional[WebCredentials] = None) -> None:    
+def download_kfw_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, web_credentials: Optional[WebCredentials] = None, dry_run: bool = True) -> None:    
     """Handler to download KFW documents using Playwright automation."""
+    if dry_run:
+        log_and_display(f"UID {meta.uid} | DRY-RUN | KFW-DOWNLOAD | skipped")
+        return
+
     try:
         success = download_kfw_invoices(
             user=web_credentials.kfw_user,
@@ -362,14 +382,14 @@ def download_kfw_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional
     except Exception as e:
         log_and_display(f"UID {meta.uid} | KFW_ERROR | Error downloading KFW documents: {e}")
 
-def manual_click_handler(meta: Meta, mail: imaplib.IMAP4_SSL, _save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
+def manual_click_handler(meta: Meta, mail: imaplib.IMAP4_SSL, _save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None, _dry_run: bool = True) -> None:
     log_and_display(f"UID {meta.uid} | MANUAL_CLICK | Click manually: {meta.invoice_link}")
 
-def ignore_handler(meta: Meta, mail: imaplib.IMAP4_SSL, _save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
+def ignore_handler(meta: Meta, mail: imaplib.IMAP4_SSL, _save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None, _dry_run: bool = True) -> None:
     log_and_display(f"UID {meta.uid} | IGNORED | {meta.sender} | '{meta.subject}'")
     
 # ---------- ROUTING ----------
-HANDLERS: Dict[Tag, Callable[[Meta, imaplib.IMAP4_SSL, Optional[str], Optional[WebCredentials]], None]] = {
+HANDLERS: Dict[Tag, Callable[[Meta, imaplib.IMAP4_SSL, Optional[str], Optional[WebCredentials], bool], None]] = {
     Tag.DELETE: delete_handler,
     Tag.DOWNLOAD_PDF: download_pdf_handler,
     Tag.DOWNLOAD_ATTACH: download_attachment_handler,
@@ -431,7 +451,7 @@ def fetch_and_process_emails(
                 tag = classify(meta, rules=rules)
 
                 if tag in HANDLERS:
-                    HANDLERS[tag](meta, mail, effective_save_dir, web_credentials)
+                    HANDLERS[tag](meta, mail, effective_save_dir, web_credentials, dry_run)
                 else:
                     logger.error(f"Unknown tag: {tag}")
                     ignore_handler(meta, mail, save_dir=effective_save_dir)
