@@ -113,7 +113,7 @@ def download_dropbox_audio(body_html: str, save_dir: str) -> list[str]:
     soup = BeautifulSoup(body_html, 'html.parser')
     links = [a['href'] for a in soup.find_all('a', href=True) if a['href'].startswith('http')]
     audio_extensions = {'.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'}
-    os.makedirs(save_dir, exist_ok=True)
+
     for link in links:
         try:
             r = requests.get(link, allow_redirects=True, timeout=5, stream=True)
@@ -229,9 +229,26 @@ def get_emails_to_process(mail: imaplib.IMAP4_SSL, mailbox: str = "INBOX", limit
     log_and_display(f"Fetched {len(emails)} emails for processing.")
     return emails
 
-def _delete(uid: int) -> None:
-    #mail.uid('MOVE', str(uid).encode(), "[Gmail]/Trash")
-    pass
+# def _delete(uid: int) -> None:
+#     #mail.uid('MOVE', str(uid).encode(), "[Gmail]/Trash")
+#     pass
+
+def _delete(uid: int, mail: imaplib.IMAP4_SSL) -> None:
+    """
+    Permanently move the e-mail with the given UID to the server's trash folder.
+    NOTE: disabled during testing to avoid data loss.
+    """
+    # TODO: uncomment the block below after staging tests
+    # ----------------------------------------------------------
+    # trash_folder = "[Gmail]/Trash"          # or mail.probably_trash_folder
+    # status, _ = mail.uid('MOVE', str(uid).encode(), trash_folder)
+    # if status != 'OK':
+    #     raise RuntimeError(f"Could not move UID {uid} to {trash_folder}")
+    # ----------------------------------------------------------
+
+    raise NotImplementedError(
+        "Delete is disabled for test runs - see TODO in _delete()."
+    )
 
 # ---------- CLASSIFIER ----------
 
@@ -263,12 +280,16 @@ def classify(meta: Meta, rules: List[Dict[str, Any]]) -> Tag:
 
 # ---------- HANDLERS ----------
 
-# def delete_handler(meta: Meta, mail) -> None:
 def delete_handler(meta: Meta, mail: imaplib.IMAP4_SSL, _save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
-    _delete(meta.uid)
-    log_and_display(f"UID {meta.uid} | DELETED | {meta.sender} | '{meta.subject}'")
+    try:
+        _delete(meta.uid, mail)
+    except NotImplementedError as e:
+        logger.warning("UID %s | DELETE-SKIPPED | %s", meta.uid, e)
+    else:
+        log_and_display(
+            f"UID {meta.uid} | DELETED | {meta.sender} | '{meta.subject}'"
+        )
 
-# def download_pdf_handler(meta: Meta, mail) -> None:
 def download_pdf_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
     assert meta.invoice_link
     r = requests.get(meta.invoice_link, timeout=30)
@@ -279,7 +300,6 @@ def download_pdf_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional
     log_and_display(f"UID {meta.uid} | DOWNLOAD | Downloaded PDF from {meta.invoice_link} to {fname}")
     delete_handler(meta, mail)
 
-# def download_attachment_handler(meta: Meta, mail) -> None:
 def download_attachment_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
     typ, data = mail.uid('FETCH', str(meta.uid).encode(), '(RFC822)')
     raw = data[0][1]
@@ -299,13 +319,11 @@ def download_attachment_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: O
     if downloaded_any:
         delete_handler(meta, mail)
 
-# def download_audio_handler(meta: Meta, mail) -> None:
 def download_audio_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None) -> None:
     """Handler to download Dropbox audio files and update meta."""
     audio_files = download_dropbox_audio(meta.body_html, save_dir=save_dir)
     meta.audio_files = audio_files  # Assuming Meta can store audio_files
 
-# def download_techem_handler(meta: Meta, mail, web_credentials: WebCredentials) -> None:
 def download_techem_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, web_credentials: Optional[WebCredentials] = None) -> None:
     """Handler to download Techem invoices using Playwright automation."""
     try:       
@@ -325,7 +343,6 @@ def download_techem_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optio
     except Exception as e:
         log_and_display(f"UID {meta.uid} | TECHEM_ERROR | Error downloading Techem invoice: {e}")
 
-# def download_kfw_handler(meta: Meta, mail, web_credentials: WebCredentials) -> None:
 def download_kfw_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, web_credentials: Optional[WebCredentials] = None) -> None:    
     """Handler to download KFW documents using Playwright automation."""
     try:
@@ -405,7 +422,7 @@ def fetch_and_process_emails(
         log_and_display(f"Logged in to server {email_credentials.imap_server}")
         emails = get_emails_to_process(mail, mailbox, limit=160)  # Your current limit
 
-        emails = tqdm(emails, desc="Processing Emails", colour="#7851a9") if progress_bar else emails
+        emails = tqdm(emails, desc="Processing Emails", colour="#ace1af") if progress_bar else emails
         
         for uid, raw_message in emails:
 
