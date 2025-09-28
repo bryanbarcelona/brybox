@@ -1,0 +1,5 @@
+{
+  "save_dir": "./temp_invoices",
+  "backup_dir": "./backups",
+  "pdf_source_dir": "./temp_invoices"
+}

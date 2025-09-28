@@ -1,0 +1,42 @@
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# .env files
+.env
+.python-version
+uv.lock
+
+# Log folders and files
+logs/
+*.log
+
+# Legacy backup files
+legacy/
+
+# Config files (sensitive)
+
+configs/*.json
+
+# Allow config example files
+
+!configs/*.example.json
+
+# Still under development - ignore
+
+tester.py
+src/brybox/core/doismith.py
+src/brybox/core/dropboss.py
+src/brybox/core/snap_jedi.py
+src/brybox/core/video_sith.py

@@ -1,0 +1,19 @@
+[project]
+name = "brybox"
+version = "0.1.0"
+description = "Brybox is a personal automation toolkit for PC organization. It streamlines repetitive tasks such as PDF sorting, photo and video organization, and email/download handling. Designed to replace tedious manual workflows, Brybox provides a flexible, extensible framework for managing digital clutter with ease."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.13.5",
+    "pdfplumber>=0.11.7",
+    "playwright>=1.55.0",
+    "pyexiftool>=0.5.6",
+    "python-dateutil>=2.9.0.post0",
+    "python-dotenv>=1.1.1",
+    "pytz>=2025.2",
+    "requests>=2.32.5",
+    "rich>=14.1.0",
+    "timezonefinder>=8.0.0",
+    "tqdm>=4.67.1",
+]

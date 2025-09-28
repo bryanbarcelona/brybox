@@ -1,0 +1,77 @@
+{
+  "Telecom Invoice": {
+    "triggers": ["Telecom Provider", "Invoice Number"],
+    "output_path": "Telecom",
+    "filename": "Telecom Invoice"
+  },
+  "Medical Report": {
+    "triggers": ["Health Insurance", "Financial Report"],
+    "output_path": "Medical/Insurance",
+    "filename": "Medical Report"
+  },
+  "Parking Permit": {
+    "triggers": ["City Authority", "Parking Permit"],
+    "output_path": "Car/Permits",
+    "filename": "Parking Permit"
+  },
+  "Car Rental Invoice": {
+    "triggers": ["Rental Company", "Cost Overview"],
+    "output_path": "Invoices/Car/Rental",
+    "filename": "Car Rental Invoice"
+  },
+  "Rideshare Invoice": {
+    "triggers": ["Rideshare Service", "City Name"],
+    "output_path": "Invoices/Car/Rideshare",
+    "filename": "Rideshare Invoice"
+  },
+  "Coaching Session": {
+    "triggers": ["Coach Name", "Coaching Session"],
+    "output_path": "Medical/Coaching",
+    "filename": "Coaching Session"
+  },
+  "Mobile Invoice": {
+    "triggers": ["Mobile Provider", "Billing"],
+    "output_path": "Mobile",
+    "filename": "Mobile Invoice"
+  },
+  "Train Ticket": {
+    "triggers": ["Train Company", "Online Ticket"],
+    "output_path": "Travel",
+    "filename": "Train Ticket"
+  },
+  "Utility Bill": {
+    "triggers": ["Utility Provider", "Monthly Bill"],
+    "output_path": "Utilities",
+    "filename": "Utility Bill"
+  },
+  "Utility Payment Plan": {
+    "triggers": ["Utility Provider", "Payment Plan"],
+    "output_path": "Utilities",
+    "filename": "Utility Payment Plan"
+  },
+  "Utility Price Update": {
+    "triggers": ["Utility Provider", "Price Update"],
+    "output_path": "Utilities",
+    "filename": "Utility Price Update"
+  },
+  "Utility Annual Report": {
+    "triggers": ["Utility Provider", "Annual Report"],
+    "output_path": "Utilities",
+    "filename": "Utility Annual Report"
+  },
+  "Parking Invoice": {
+    "triggers": ["Parking Service", "Invoice"],
+    "output_path": "Invoices/Car/Parking",
+    "filename": "Parking Invoice"
+  },
+  "Bus Invoice": {
+    "triggers": ["Bus Company", "Booking Invoice"],
+    "output_path": "Travel",
+    "filename": "Bus Invoice"
+  },
+  "Bus Ticket": {
+    "triggers": ["Bus Company", "Boarding Pass"],
+    "output_path": "Travel",
+    "filename": "Bus Ticket"
+  }
+}

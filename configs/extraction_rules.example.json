@@ -1,0 +1,29 @@
+{
+  "same_line": [
+    "Invoice Date",
+    "Invoice Number",
+    "Bill No.",
+    "Order Number",
+    "Billing Date",
+    "Transaction Date",
+    "Reference ID",
+    "Cost Summary",
+    "Booking ID",
+    "Invoice Ref",
+    "Statement",
+    "Delivery Date"
+  ],
+  "previous_line": [
+    "Parking Permit",
+    "Utility Provider",
+    "Bank Statement",
+    "Service Provider"
+  ],
+  "next_line": [
+    "Document Date",
+    "Order ID",
+    "Booking Number",
+    "Invoice Date",
+    "Receipt"
+  ]
+}

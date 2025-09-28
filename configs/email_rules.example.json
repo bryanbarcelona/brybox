@@ -1,0 +1,63 @@
+[
+  {
+    "sender": "billing@example.com",
+    "subject": "invoice",
+    "has_pdf_attachment": true,
+    "embedded_link": true,
+    "action": "DOWNLOAD_PDF"
+  },
+  {
+    "sender": "service@example.com",
+    "subject": "receipt",
+    "action": "DELETE"
+  },
+  {
+    "sender": "security@socialplatform.com",
+    "subject": "account_update",
+    "action": "DELETE"
+  },
+  {
+    "sender": "audio@contentprovider.com",
+    "action": "DOWNLOAD_AUDIO"
+  },
+  {
+    "sender": "support@telecom.com",
+    "has_pdf_attachment": true,
+    "action": "DOWNLOAD_ATTACH"
+  },
+  {
+    "sender": "orders@retail.com",
+    "has_pdf_attachment": true,
+    "action": "DOWNLOAD_ATTACH"
+  },
+  {
+    "sender": "delivery@store.com",
+    "has_pdf_attachment": true,
+    "action": "DOWNLOAD_ATTACH"
+  },
+  {
+    "sender": "billing@rideshare.com",
+    "embedded_link": true,
+    "action": "DOWNLOAD_PDF"
+  },
+  {
+    "sender": "billing@utility.com",
+    "action": "TECHEM"
+  },
+  {
+    "sender": "noreply@bank.com",
+    "action": "KFW"
+  },
+  {
+    "subject": "order_confirmation",
+    "action": "MANUAL_CLICK"
+  },
+  {
+    "sender": "notifications@jobsite.com",
+    "action": "DELETE"
+  },
+  {
+    "sender": "noreply@localservice.com",
+    "action": "IGNORE"
+  }
+]
