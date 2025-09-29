@@ -437,7 +437,8 @@ def fetch_and_process_emails(
         log_and_display(f"Logged in to server {email_credentials.imap_server}")
         emails = get_emails_to_process(mail, mailbox, limit=50)  # Your current limit
 
-        emails = trackerator(emails, description="Processing Emails") if progress_bar else emails
+        log_and_display(f"Processing {len(emails)} emails...", sticky=True)
+        emails = trackerator(emails, description="Processing Emails", final_message="All emails processed!") if progress_bar else emails
 
         for uid, raw_message in emails:
 
@@ -453,7 +454,7 @@ def fetch_and_process_emails(
             except Exception as e:
                 logger.exception(f"Failed to process email UID {uid}: {e}")
                 continue
-    log_and_display(f"Finished email processing")
+        #log_and_display(f"Finished email processing", sticky=True)
 
 if __name__ == "__main__":
 

@@ -262,12 +262,12 @@ class _FileMover:
         output_dir = os.path.dirname(destination)
         
         if self.dry_run:
-            print(f"Would create directory: {output_dir}")
+            log_and_display(f"Would create directory: {output_dir}")
             if os.path.exists(destination):
-                print(f"Would delete source file: {source}")
+                log_and_display(f"Would delete source file: {source}")
                 return True, False
             else:
-                print(f"Would move {source} to {destination}")
+                log_and_display(f"Would move {source} to {destination}")
                 return True, True
         
         # Create directory if needed
@@ -296,7 +296,7 @@ class _FileMover:
             return False
             
         if self.dry_run:
-            print(f"Would backup {source} to {backup_path}")
+            log_and_display(f"Would backup {source} to {backup_path}")
             return True
             
         try:
@@ -522,7 +522,7 @@ class DoctopusPrimeNexus:
 
         Args:
             include_backup: Whether to create backup copies
-            use_tqdm: Show progress bar with tqdm
+            progress_bar: Whether to show progress bar
 
         Returns:
             Dict mapping file paths to success status
@@ -530,7 +530,8 @@ class DoctopusPrimeNexus:
         pdf_files = glob.glob(os.path.join(self.dir_path, "*.pdf"))
         results = {}
 
-        pdf_files = trackerator(pdf_files, description="Processing PDFs") if progress_bar else pdf_files
+        log_and_display(f"Processing {len(pdf_files)} PDF file(s) in {self.dir_path}", sticky=True)
+        pdf_files = trackerator(pdf_files, description="Processing PDFs", final_message="All PDFs processed!") if progress_bar else pdf_files
 
         for pdf_file in pdf_files:
             
@@ -547,11 +548,9 @@ class DoctopusPrimeNexus:
                 
             except Exception as e:
                 if progress_bar:
-                    print(f"Error processing {pdf_file}: {e}")
+                    log_and_display(f"Error processing {pdf_file}: {e}")
                 else:
-                    print(f"Error processing {pdf_file}: {e}")
+                    log_and_display(f"Error processing {pdf_file}: {e}")
                 results[pdf_file] = False
-        
-        log_and_display("Batch processing complete.", sticky=True, log=False)
 
         return results
