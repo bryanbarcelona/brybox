@@ -1,103 +1,119 @@
-# import inspect
-# from tqdm import tqdm
-
-
-# def log_and_display(message: str, level: str = "info", log: bool = True, display: bool = True):
-#     """
-#     Log message using caller's module logger and display via tqdm with line replacement.
-    
-#     Args:
-#         message: The message to log and display
-#         level: Log level (info, warning, error, debug)
-#         log: Whether to log the message (default: True)
-#         display: Whether to display via tqdm (default: True)
-    
-#     Note: Display always replaces current line to preserve progress bars.
-#     """
-#     # Get the calling module's logger variable
-#     frame = inspect.currentframe().f_back
-#     caller_logger = frame.f_globals.get('logger')
-    
-#     # Log if caller has a logger and logging is requested
-#     if log and caller_logger:
-#         getattr(caller_logger, level.lower())(message)
-    
-#     # Display via tqdm if requested (always replaces line)
-#     if display:
-#         import sys
-#         print(f"\r{message}", end="\r", flush=True, file=sys.stderr)
-#         #tqdm.write(f"{message}", end="\r")  # Move to next line after message
-
-
-# 📄 display_utils.py — NOW ACTUALLY WORKING 😅
-
-import sys
+from __future__ import annotations
 import inspect
-from tqdm import tqdm
+import logging
+from rich.console import Console
+from rich.progress import (
+    Progress,
+    BarColumn,
+    MofNCompleteColumn,
+    TimeElapsedColumn,
+    TextColumn,
+)
 
-class DynamicDisplay:
-    def __init__(self):
-        self._last_len = 0
-        self._has_temp_line = False  # Track if we're currently occupying the temp line
+__all__ = ["log_manager", "get_configured_logger", "log_and_display", "trackerator"]
 
-    def write_temp(self, message: str, file=sys.stderr):
-        # Pad to clear previous
-        padded = message.ljust(self._last_len)
-        self._last_len = max(len(message), self._last_len)
-
-        if self._has_temp_line:
-            # Move cursor up one line to overwrite
-            file.write('\x1b[1A')  # ANSI: move cursor up 1 line
-
-        # Write the message and go to next line (so it becomes visible)
-        tqdm.write(padded, file=file, end='\n')
-        file.flush()
-
-        self._has_temp_line = True
-
-    def write_sticky(self, message: str, file=sys.stderr):
-        # If we had a temp line, we're already on the next line — just write
-        tqdm.write(message, file=file)
-        self._last_len = 0
-        self._has_temp_line = False
-        file.flush()
-
-
-# Singleton
-dynamic_display = DynamicDisplay()
-
-
-def log_and_display(
-    message: str,
-    level: str = "info",
-    log: bool = True,
-    display: bool = True,
-    sticky: bool = False
-):
-    frame = inspect.currentframe().f_back
-    caller_logger = frame.f_globals.get('logger')
-
-    if log and caller_logger:
-        getattr(caller_logger, level.lower())(message)
-
-    if display:
-        if sticky:
-            dynamic_display.write_sticky(message)
-        else:
-            dynamic_display.write_temp(message)
-
-def get_configured_logger(name: str):
-    """Get logger and configure it according to package settings"""
+# --------------------------------------------------------------------------- #
+#  classic logger factory (unchanged)
+# --------------------------------------------------------------------------- #
+def get_configured_logger(name: str) -> logging.Logger:
+    """Build or return an already-configured logger."""
     from brybox import VERBOSE_LOGGING, _CONFIGURED_LOGGERS
-    import logging
-    
+
     logger = logging.getLogger(name)
-    if VERBOSE_LOGGING:
-        logger.setLevel(logging.INFO)
-    else:
-        logger.setLevel(logging.WARNING)
-    
+    logger.setLevel(logging.INFO if VERBOSE_LOGGING else logging.WARNING)
+
     if name not in _CONFIGURED_LOGGERS:
         _CONFIGURED_LOGGERS.append(name)
-    
     return logger
+
+
+# --------------------------------------------------------------------------- #
+#  rich-backed console / progress singleton
+# --------------------------------------------------------------------------- #
+
+def _find_logger() -> logging.Logger | None:
+    """First logger found outside this file."""
+    for frm in inspect.stack()[2:]:          # skip _find_logger + log
+        if frm.filename == __file__:
+            continue
+        if (lg := frm.frame.f_globals.get("logger")) is not None:
+            return lg
+    return None
+
+class ConsoleLogger:
+    """Thin façade: progress + optional sticky messages."""
+
+    def __init__(self) -> None:
+        self.console = Console()
+        self._progress: Progress | None = None
+        self._task: int | None = None
+        # --- explicit wiring point ----------------------------------------- #
+        self.logger: logging.Logger | None = None
+
+    #  progress lifecycle
+    def start_progress(self, total: int, description: str = "Working…") -> None:
+        if self._progress:
+            self._progress.stop()
+
+        self._progress = Progress(
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TextColumn("[progress.description]{task.description}"),  # mutable text
+            console=self.console,
+            transient=False,
+        )
+        self._progress.start()
+        self._task = self._progress.add_task(description, total=total)
+
+    def update_progress(self, advance: int = 1, description: str | None = None) -> None:
+        if not self._progress or self._task is None:
+            return
+        self._progress.advance(self._task, advance)
+        if description is not None:
+            self._progress.update(self._task, description=description)
+
+        if self._progress.tasks[self._task].finished:
+            self._progress.stop()
+            self._progress = self._task = None
+
+    #  unified message API
+    def log(self, message: str, *, sticky: bool = False,
+            level: str = "info", log: bool = True) -> None:
+
+        # 1. explicit logger takes precedence
+        logger = self.logger
+        # 2. otherwise walk the stack once
+        if logger is None and log:
+            logger = _find_logger()          # no arguments, cached
+        # 3. log if we found one
+        if logger is not None:
+            getattr(logger, level.lower())(message)
+
+        # 4. display part unchanged
+        if sticky:
+            self.console.print(message)
+        elif self._progress:
+            self._progress.update(self._task, description=message)
+        else:
+            self.console.print(message, end="\r")
+
+
+# --------------------------------------------------------------------------- #
+#  public façade
+# --------------------------------------------------------------------------- #
+log_manager = ConsoleLogger()
+
+
+def log_and_display(message: str, sticky: bool = False, level: str = "info", log: bool = True) -> None:
+    """Log (if logger bound) + display (rich or plain)."""
+    log_manager.log(message, sticky=sticky, level=level, log=log)
+
+
+def trackerator(items, description: str = "Working..."):
+    """Yield items while driving the progress bar."""
+    log_manager.start_progress(total=len(items), description=description)
+    for idx, item in enumerate(items, start=1):
+        yield item
+        log_manager.update_progress(advance=1)
+

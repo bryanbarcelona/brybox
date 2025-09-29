@@ -16,10 +16,10 @@ from typing import Any, Dict, List, Optional, Type, Union
 
 import pdfplumber
 from dateutil import parser
-from tqdm import tqdm
+
 
 from ..utils.health_check import is_healthy
-from ..utils.logging import log_and_display, get_configured_logger
+from ..utils.logging import log_and_display, get_configured_logger, trackerator
 from ..utils.config_loader import ConfigLoader as _ConfigLoader
 from ..events.bus import publish_file_moved, publish_file_deleted
 
@@ -262,12 +262,12 @@ class _FileMover:
         output_dir = os.path.dirname(destination)
         
         if self.dry_run:
-            tqdm.write(f"Would create directory: {output_dir}")
+            print(f"Would create directory: {output_dir}")
             if os.path.exists(destination):
-                tqdm.write(f"Would delete source file: {source}")
+                print(f"Would delete source file: {source}")
                 return True, False
             else:
-                tqdm.write(f"Would move {source} to {destination}")
+                print(f"Would move {source} to {destination}")
                 return True, True
         
         # Create directory if needed
@@ -284,7 +284,6 @@ class _FileMover:
             shutil.move(source, destination)
             if not is_healthy(destination):
                 log_and_display(f"Moved file is corrupted: {destination}", level="error")
-                tqdm.write(f"Error: Moved file is corrupted: {destination}")
                 return False, False
             
             log_and_display(f"Moved {source} to {destination}.")
@@ -297,7 +296,7 @@ class _FileMover:
             return False
             
         if self.dry_run:
-            tqdm.write(f"Would backup {source} to {backup_path}")
+            print(f"Would backup {source} to {backup_path}")
             return True
             
         try:
@@ -531,7 +530,7 @@ class DoctopusPrimeNexus:
         pdf_files = glob.glob(os.path.join(self.dir_path, "*.pdf"))
         results = {}
 
-        pdf_files = tqdm(pdf_files, desc="Processing PDFs",colour="#7851a9") if progress_bar else pdf_files
+        pdf_files = trackerator(pdf_files, description="Processing PDFs") if progress_bar else pdf_files
 
         for pdf_file in pdf_files:
             
@@ -548,9 +547,9 @@ class DoctopusPrimeNexus:
                 
             except Exception as e:
                 if progress_bar:
-                    tqdm.write(f"Error processing {pdf_file}: {e}")
+                    print(f"Error processing {pdf_file}: {e}")
                 else:
-                    tqdm.write(f"Error processing {pdf_file}: {e}")
+                    print(f"Error processing {pdf_file}: {e}")
                 results[pdf_file] = False
         
         log_and_display("Batch processing complete.", sticky=True, log=False)

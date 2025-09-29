@@ -26,22 +26,22 @@ def main():
     # #     dry_run=False
     # # )
     
-    # # Process and move file
+    # Process and move file
     # success = processor.shuttle_service(include_backup=True)
     # print(f"Processing success: {success}")
 
-    # verifier = DirectoryVerifier(r"D:\Testing PDFs", r"D:\Testing PDF Target")
-    # # Example 2: Batch processing
-    # batch_processor = DoctopusPrimeNexus(
-    #     dir_path=r"D:\Testing PDFs",
-    #     base_dir=r"D:\Testing PDF Target",
-    #     dry_run=False
-    # )
+    verifier = DirectoryVerifier(r"D:\Testing PDFs", r"D:\Testing PDF Target")
+    # Example 2: Batch processing
+    batch_processor = DoctopusPrimeNexus(
+        dir_path=r"D:\Testing PDFs",
+        base_dir=r"D:\Testing PDF Target",
+        dry_run=False
+    )
     
-    # results = batch_processor.process_all(include_backup=False)
-    # #print(f"Batch processing results: {results}")
-    # success = verifier.report()
-    # verifier.cleanup()
+    results = batch_processor.process_all(include_backup=False)
+    #print(f"Batch processing results: {results}")
+    success = verifier.report()
+    verifier.cleanup()
 
     fetch_and_process_emails()
 

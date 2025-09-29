@@ -13,12 +13,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 import tempfile
 
-from tqdm import tqdm
-
 from .web_marionette import download_kfw_invoices, download_techem_invoice
 from ..utils.credentials import CredentialsManager, EmailCredentials, WebCredentials
-from ..utils.logging import log_and_display, get_configured_logger
+from ..utils.logging import log_and_display, get_configured_logger, trackerator
 from ..utils.config_loader import ConfigLoader
+
 
 # --- config ------------------------------------------------------------------
 
@@ -229,10 +228,6 @@ def get_emails_to_process(mail: imaplib.IMAP4_SSL, mailbox: str = "INBOX", limit
     log_and_display(f"Fetched {len(emails)} emails for processing.")
     return emails
 
-# def _delete(uid: int) -> None:
-#     #mail.uid('MOVE', str(uid).encode(), "[Gmail]/Trash")
-#     pass
-
 def _delete(uid: int, mail: imaplib.IMAP4_SSL) -> None:
     """
     Permanently move the e-mail with the given UID to the server's trash folder.
@@ -440,10 +435,10 @@ def fetch_and_process_emails(
         mail.select(mailbox)
 
         log_and_display(f"Logged in to server {email_credentials.imap_server}")
-        emails = get_emails_to_process(mail, mailbox, limit=160)  # Your current limit
+        emails = get_emails_to_process(mail, mailbox, limit=50)  # Your current limit
 
-        emails = tqdm(emails, desc="Processing Emails", colour="#ace1af") if progress_bar else emails
-        
+        emails = trackerator(emails, description="Processing Emails") if progress_bar else emails
+
         for uid, raw_message in emails:
 
             try:
@@ -459,7 +454,6 @@ def fetch_and_process_emails(
                 logger.exception(f"Failed to process email UID {uid}: {e}")
                 continue
     log_and_display(f"Finished email processing")
-
 
 if __name__ == "__main__":
 
