@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 import tempfile
 
-from ..web_marionette.scrapers import download_kfw_invoices, download_techem_invoice
+from ..web_marionette.scrapers import KfwScraper, TechemScraper
 from ..utils.credentials import CredentialsManager, EmailCredentials, WebCredentials
 from ..utils.logging import log_and_display, get_configured_logger, trackerator
 from ..utils.config_loader import ConfigLoader
@@ -338,12 +338,13 @@ def download_techem_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optio
         return
 
     try:       
-        result = download_techem_invoice(
-            user=web_credentials.techem_user,
+        scraper = TechemScraper(
+            username=web_credentials.techem_user,
             password=web_credentials.techem_password,
             download_dir=save_dir,
             headless=False
         )
+        result = scraper.download()
         
         if result:
             log_and_display(
@@ -372,13 +373,14 @@ def download_kfw_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional
         return
 
     try:
-        result = download_kfw_invoices(
-            user=web_credentials.kfw_user,
+        scraper = KfwScraper(
+            username=web_credentials.kfw_user,
             password=web_credentials.kfw_password,
             download_dir=save_dir,
             headless=True
         )
-        
+        result = scraper.download()
+
         if result:
             log_and_display(
                 f"UID {meta.uid} | KFW_DOWNLOAD | Downloaded {result.downloaded}/{result.total_found} documents",

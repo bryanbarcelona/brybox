@@ -18,8 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Error handling**: Replace boolean returns with structured DownloadResult objects
   - Track total found, downloaded, failed counts
   - Capture specific error messages for each failure
-  - Maintains backward compatibility via __bool__ method
-- **Request capture**: Dynamic polling (100ms intervals, 10s timeout) replaces static 3s wait
+  - Maintains backward compatibility via `__bool__` method- **Request capture**: Dynamic polling (100ms intervals, 10s timeout) replaces static 3s wait
 - **Logging**: Refined for better UX
   - Ephemeral progress updates (not logged to file)
   - Persistent success/failure logs with details
