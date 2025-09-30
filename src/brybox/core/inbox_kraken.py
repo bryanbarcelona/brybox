@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 import tempfile
 
-from .web_marionette import download_kfw_invoices, download_techem_invoice
+from ..web_marionette.scrapers import download_kfw_invoices, download_techem_invoice
 from ..utils.credentials import CredentialsManager, EmailCredentials, WebCredentials
 from ..utils.logging import log_and_display, get_configured_logger, trackerator
 from ..utils.config_loader import ConfigLoader
@@ -219,8 +219,8 @@ def get_emails_to_process(mail: imaplib.IMAP4_SSL, mailbox: str = "INBOX", limit
     
     emails = []
     for uid in uids:
-        # if uid != 43798:  # Debug skip
-        #     continue
+        if uid != 43798 and uid != 43672:  # Debug skip
+            continue
         typ, data = mail.uid('FETCH', str(uid), '(RFC822)')
         raw = data[0][1]
         emails.append((uid, raw))
@@ -334,48 +334,74 @@ def download_audio_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Option
 def download_techem_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, web_credentials: Optional[WebCredentials] = None, dry_run: bool = True) -> None:
     """Handler to download Techem invoices using Playwright automation."""
     if dry_run:
-        log_and_display(f"UID {meta.uid} | DRY-RUN | TECHEM-DOWNLOAD | skipped")
+        log_and_display(f"UID {meta.uid} | DRY-RUN | TECHEM-DOWNLOAD | skipped", log=True, sticky=False)
         return
 
     try:       
-        success = download_techem_invoice(
+        result = download_techem_invoice(
             user=web_credentials.techem_user,
             password=web_credentials.techem_password,
             download_dir=save_dir,
             headless=False
         )
         
-        if success:
-            log_and_display(f"UID {meta.uid} | TECHEM_DOWNLOAD | Successfully downloaded Techem invoice")
+        if result:
+            log_and_display(
+                f"UID {meta.uid} | TECHEM_DOWNLOAD | Successfully downloaded invoice",
+                log=True, sticky=False
+            )
             delete_handler(meta, mail)
         else:
-            log_and_display(f"UID {meta.uid} | TECHEM_FAILED | Failed to download Techem invoice - email retained")
+            error_details = '; '.join(result.errors) if result.errors else 'Unknown error'
+            log_and_display(
+                f"UID {meta.uid} | TECHEM_FAILED | {error_details} - email retained",
+                level="warning", log=True, sticky=False
+            )
             
     except Exception as e:
-        log_and_display(f"UID {meta.uid} | TECHEM_ERROR | Error downloading Techem invoice: {e}")
+        log_and_display(
+            f"UID {meta.uid} | TECHEM_ERROR | Unexpected error: {e} - email retained",
+            level="error", log=True, sticky=False
+        )
+
 
 def download_kfw_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional[str] = None, web_credentials: Optional[WebCredentials] = None, dry_run: bool = True) -> None:    
     """Handler to download KFW documents using Playwright automation."""
     if dry_run:
-        log_and_display(f"UID {meta.uid} | DRY-RUN | KFW-DOWNLOAD | skipped")
+        log_and_display(f"UID {meta.uid} | DRY-RUN | KFW-DOWNLOAD | skipped", log=True, sticky=False)
         return
 
     try:
-        success = download_kfw_invoices(
+        result = download_kfw_invoices(
             user=web_credentials.kfw_user,
             password=web_credentials.kfw_password,
             download_dir=save_dir,
             headless=True
         )
         
-        if success:
-            log_and_display(f"UID {meta.uid} | KFW_DOWNLOAD | Successfully downloaded KFW documents")
+        if result:
+            log_and_display(
+                f"UID {meta.uid} | KFW_DOWNLOAD | Downloaded {result.downloaded}/{result.total_found} documents",
+                log=True, sticky=False
+            )
             delete_handler(meta, mail)
         else:
-            log_and_display(f"UID {meta.uid} | KFW_FAILED | Failed to download KFW documents - email retained")
+            error_summary = f"{result.downloaded}/{result.total_found} succeeded"
+            if result.errors:
+                error_summary += f"; Errors: {'; '.join(result.errors[:3])}"  # Show first 3 errors
+                if len(result.errors) > 3:
+                    error_summary += f" (+{len(result.errors) - 3} more)"
+            
+            log_and_display(
+                f"UID {meta.uid} | KFW_FAILED | {error_summary} - email retained",
+                level="warning", log=True, sticky=False
+            )
             
     except Exception as e:
-        log_and_display(f"UID {meta.uid} | KFW_ERROR | Error downloading KFW documents: {e}")
+        log_and_display(
+            f"UID {meta.uid} | KFW_ERROR | Unexpected error: {e} - email retained",
+            level="error", log=True, sticky=False
+        )
 
 def manual_click_handler(meta: Meta, mail: imaplib.IMAP4_SSL, _save_dir: Optional[str] = None, _web_credentials: Optional[WebCredentials] = None, _dry_run: bool = True) -> None:
     log_and_display(f"UID {meta.uid} | MANUAL_CLICK | Click manually: {meta.invoice_link}")
@@ -435,7 +461,7 @@ def fetch_and_process_emails(
         mail.select(mailbox)
 
         log_and_display(f"Logged in to server {email_credentials.imap_server}")
-        emails = get_emails_to_process(mail, mailbox, limit=50)  # Your current limit
+        emails = get_emails_to_process(mail, mailbox, limit=None)  # Your current limit
 
         log_and_display(f"Processing {len(emails)} emails...", sticky=True)
         emails = trackerator(emails, description="Processing Emails", final_message="All emails processed!") if progress_bar else emails
