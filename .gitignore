@@ -36,6 +36,7 @@ configs/*.json
 # Still under development - ignore
 
 tester.py
+test_env_resetter.py
 src/brybox/core/doismith.py
 src/brybox/core/dropboss.py
 src/brybox/core/snap_jedi.py

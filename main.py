@@ -1,5 +1,6 @@
 import logging
 import glob
+from pathlib import Path
 from brybox import DoctopusPrime
 from logging_config import configure_logging
 from brybox import enable_verbose_logging
@@ -7,6 +8,7 @@ from brybox import DoctopusPrime
 from brybox import DoctopusPrimeNexus
 from brybox import fetch_and_process_emails, log_and_display
 from brybox import DirectoryVerifier
+from brybox import push_photos
 
 logger = logging.getLogger("BryBox")
 
@@ -60,5 +62,48 @@ def main():
     # from brybox import inbox_kraken
     # #inbox_kraken.fetch_and_process_emails()
 
+def test_pixelporter():
+    """Test photo ingestion with verification."""
+    
+    # Define paths (adjust to your test directories)
+    source_dir = Path(r"d:\\PixelporterTest\\20251003\\src")
+    target_dir = Path(r"d:\\PixelporterTest\\20251003\\dst")
+
+    # Initialize verifier
+    verifier = DirectoryVerifier(str(source_dir), str(target_dir))
+    
+    # Run PixelPorter (dry run first)
+    print("=== DRY RUN ===")
+    result = push_photos(
+        source=source_dir,
+        target=target_dir,
+        dry_run=True
+    )
+    
+    print(f"\nDry run results: Processed={result.processed}, Skipped={result.skipped}, Failed={result.failed}")
+    
+    # Real run
+    print("\n=== REAL RUN ===")
+    result = push_photos(
+        source=source_dir,
+        target=target_dir,
+        dry_run=False
+    )
+    
+    print(f"\nReal run results: Processed={result.processed}, Skipped={result.skipped}, Failed={result.failed}")
+    
+    # Verify
+    print("\n=== VERIFICATION ===")
+    success = verifier.report()
+    verifier.cleanup()
+    
+    if not success:
+        print("❌ Verification failed!")
+        return False
+    
+    print("✅ All operations verified successfully")
+    return True
+
 if __name__ == "__main__":
-    main()
+    #main()
+    test_pixelporter()

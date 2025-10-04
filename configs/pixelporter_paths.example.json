@@ -1,0 +1,4 @@
+{
+  "source_folder": "/path/to/dropbox/camera_uploads",
+  "target_folder": "/path/to/photo_bucket"
+}

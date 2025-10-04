@@ -48,16 +48,3 @@ class ConfigLoader:
         configs = ConfigLoader.load_configs(config_path, {"config": filename})
         return configs.get("config", {})
 
-# def load_config(file_path):
-#     import json
-#     from pathlib import Path
-
-#     file_path = Path(file_path)
-#     if not file_path.exists():
-#         raise FileNotFoundError(f"Configuration file not found: {file_path}")
-
-#     with open(file_path, 'r', encoding='utf-8') as f:
-#         config = json.load(f)
-
-#     return config
-
