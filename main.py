@@ -63,8 +63,16 @@ def main():
     # #inbox_kraken.fetch_and_process_emails()
 
 def test_pixelporter():
+
     """Test photo ingestion with verification."""
     
+    configure_logging()
+    enable_verbose_logging()
+
+    #logger.setLevel(logging.INFO)
+    # logger.info("Logging is configured.")
+    log_and_display("Logging is configured.", sticky=True)
+
     # Define paths (adjust to your test directories)
     source_dir = Path(r"d:\\PixelporterTest\\20251003\\src")
     target_dir = Path(r"d:\\PixelporterTest\\20251003\\dst")

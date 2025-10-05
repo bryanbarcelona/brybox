@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Set, Optional
 
 from .bus import event_bus
-from .models import FileMovedEvent, FileDeletedEvent
+from .models import FileMovedEvent, FileDeletedEvent, FileCopiedEvent
 from ..utils.logging import log_and_display, get_configured_logger
 
 logger = get_configured_logger("DirectoryVerifier")
@@ -44,6 +44,7 @@ class DirectoryVerifier:
         # Subscribe to file operation events
         event_bus.subscribe(FileMovedEvent, self._handle_file_moved)
         event_bus.subscribe(FileDeletedEvent, self._handle_file_deleted)
+        event_bus.subscribe(FileCopiedEvent, self._handle_file_copied)
         
         logger.info(f"Initialized verifier - Source: {len(self.initial_source_files)} files, "
                    f"Target: {len(self.initial_target_files)} files")
@@ -103,7 +104,18 @@ class DirectoryVerifier:
         self.expected_target_files.discard(file_path)
         
         logger.debug(f"Delete event: {Path(file_path).name}")
-    
+
+    def _handle_file_copied(self, event: FileCopiedEvent) -> None:
+        """
+        Copy: source stays, destination gains the file.
+        """
+        dest_path = str(Path(event.destination_path).resolve())
+
+        # source is intentionally left untouched
+        self.expected_target_files.add(dest_path)
+
+        logger.debug(f"Copy event: {Path(dest_path).name} added to target")
+
     def report(self) -> bool:
         """
         Verify actual filesystem state matches expected state based on events.
@@ -192,4 +204,5 @@ class DirectoryVerifier:
         """
         event_bus.unsubscribe(FileMovedEvent, self._handle_file_moved)
         event_bus.unsubscribe(FileDeletedEvent, self._handle_file_deleted)
+        event_bus.unsubscribe(FileCopiedEvent, self._handle_file_copied)
         logger.debug("Unsubscribed from file operation events")

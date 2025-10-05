@@ -8,7 +8,7 @@ from datetime import datetime
 from threading import Lock
 from typing import Any, Callable, Dict, List, Type, TypeVar
 
-from .models import FileMovedEvent, FileDeletedEvent
+from .models import FileMovedEvent, FileDeletedEvent, FileCopiedEvent
 
 # Type for event classes
 EventType = TypeVar('EventType')
@@ -140,4 +140,25 @@ def publish_file_deleted(file_path: str, file_size: int) -> None:
         timestamp=datetime.now()
     )
     
+    event_bus.publish(event)
+
+def publish_file_copied(source_path: str, destination_path: str,
+                       source_size: int, destination_size: int,
+                       source_healthy: bool, destination_healthy: bool) -> None:
+    """
+    Publish FileCopiedEvent **only** after the copy and both post-checks succeed.
+    Caller must guarantee:
+        - both files exist
+        - source_healthy and destination_healthy are True
+        - sizes are non-negative
+    """
+    event = FileCopiedEvent(
+        source_path=source_path,
+        destination_path=destination_path,
+        source_size=source_size,
+        destination_size=destination_size,
+        source_healthy=source_healthy,
+        destination_healthy=destination_healthy,
+        timestamp=datetime.now()
+    )
     event_bus.publish(event)

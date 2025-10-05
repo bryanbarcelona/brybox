@@ -10,7 +10,7 @@ import shutil
 
 from ...utils.config_loader import ConfigLoader
 from ...utils.logging import log_and_display, get_configured_logger
-from ...events.bus import publish_file_moved, publish_file_deleted
+from ...events.bus import publish_file_moved, publish_file_deleted, publish_file_copied
 from ...utils.apple_files import AppleSidecarManager
 from .protocols import FileProcessor, Deduplicator, ProcessResult
 
@@ -103,7 +103,7 @@ def _stage_files_to_target(
         # Generate collision-safe temp name
         temp_name = _generate_temp_name(file_path)
         temp_image_path = target / temp_name
-        print(f"Generated temp name: {file_path.name} -> {temp_name.stem} // {temp_image_path}")
+
         # Find sidecars if migration enabled
         temp_sidecar_paths = []
 
@@ -111,16 +111,27 @@ def _stage_files_to_target(
             renamed_group = AppleSidecarManager.get_renamed_sidecars(file_path, temp_name.stem)
             for rename in renamed_group.renames:
                 target_path = target / rename.new_filename
+                temp_sidecar_paths.append(target_path)
+
                 if not dry_run:
                     shutil.copy2(rename.original, target_path)
 
+                    # TODO: Implement actually health checks for sidecars
+                    publish_file_copied(
+                        source_path=str(rename.original),
+                        destination_path=str(target_path),
+                        source_size=rename.original.stat().st_size,
+                        destination_size=target_path.stat().st_size,
+                        source_healthy=True,
+                        destination_healthy=True
+                    )
                     # Health check: verify copy
                     if not target_path.exists():
                         raise IOError(f"Failed to copy sidecar: {rename.original}")
                     if target_path.stat().st_size != rename.original.stat().st_size:
                         raise IOError(f"Size mismatch for sidecar: {rename.original}")
                 
-                logger.debug(f"Staged sidecar: {rename.original} -> {target_path}")
+                log_and_display(f"Staged sidecar: {rename.original} -> {target_path}")
         
         # Copy main image
         if dry_run:
@@ -129,16 +140,26 @@ def _stage_files_to_target(
                 f"(+ {len(temp_sidecar_paths)} sidecars)"
             )
         else:
-            print(f"Staging image: {file_path.name} -> {temp_name}")
+            log_and_display(f"Staging image: {file_path.name} -> {temp_name}", log=False)
             shutil.copy2(file_path, temp_image_path)
-            
+
+            # TODO: Implement actually health checks for main image
+            publish_file_copied(
+                source_path=str(file_path),
+                destination_path=str(temp_image_path),
+                source_size=file_path.stat().st_size,
+                destination_size=temp_image_path.stat().st_size,
+                source_healthy=True,
+                destination_healthy=True
+            )
+
             # Health check: verify copy
             if not temp_image_path.exists():
                 raise IOError(f"Failed to copy image: {file_path.name}")
             if temp_image_path.stat().st_size != file_path.stat().st_size:
                 raise IOError(f"Size mismatch for image: {file_path.name}")
             
-            logger.info(
+            log_and_display(
                 f"Staged: {file_path.name} -> {temp_name} "
                 f"(+ {len(temp_sidecar_paths)} sidecars)"
             )

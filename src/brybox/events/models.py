@@ -92,17 +92,54 @@ class FileDeletedEvent:
                 f"'{self.filename}', "
                 f"size={self.file_size})")
     
+@dataclass(frozen=True)
+class FileCopiedEvent:
+    """
+    Published only after a copy **and** its post-checks succeed.
+    Both files must exist, be healthy, and sizes must match expectations.
+    """
+    source_path: str
+    destination_path: str
+    source_size: int
+    destination_size: int
+    source_healthy: bool
+    destination_healthy: bool
+    timestamp: datetime
 
+    def __post_init__(self) -> None:
+        if not (self.source_path and self.destination_path):
+            raise ValueError("Source and destination paths required")
+        if self.source_size < 0 or self.destination_size < 0:
+            raise ValueError("File sizes must be non-negative")
+        if not (self.source_healthy and self.destination_healthy):
+            raise ValueError("Both files must pass health checks")
+
+    @property
+    def source_name(self) -> str:
+        return Path(self.source_path).name
+
+    @property
+    def destination_name(self) -> str:
+        return Path(self.destination_path).name
+
+    @property
+    def source_dir(self) -> str:
+        return str(Path(self.source_path).parent)
+
+    @property
+    def destination_dir(self) -> str:
+        return str(Path(self.destination_path).parent)
+
+    def __repr__(self) -> str:
+        return (f"FileCopiedEvent("
+                f"'{self.source_name}' -> '{self.destination_name}', "
+                f"src_size={self.source_size}, dst_size={self.destination_size}, "
+                f"src_healthy={self.source_healthy}, dst_healthy={self.destination_healthy})")
+    
 # ---------------------------------------------------------------------------
 # TODO: Implement FileIgnoredEvent
 # @dataclass(frozen=True)
 # class FileIgnoredEvent:
 #     """Event for when files are skipped due to processing rules."""
-#     pass
-#
-# TODO: Implement FileCopyEvent
-# @dataclass(frozen=True)
-# class FileCopyEvent:
-#     """Event for when files are copied as part of processing."""
 #     pass
 # ---------------------------------------------------------------------------

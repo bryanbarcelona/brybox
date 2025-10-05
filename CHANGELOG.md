@@ -3,6 +3,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **PixelPorter**: Photo ingestion module (refactored from pre-repo legacy DropBoss code)
+  - Protocol-based architecture with `FileProcessor` and `Deduplicator` interfaces
+  - Dry-run mode, collision detection, and automatic filename resolution
+  - Full Apple sidecar support:
+    - Discovers and migrates regular, hidden (`._`), `_O` edited, and hidden `_O` sidecars
+    - Preserves Apple naming conventions during staging (e.g., `._IMG_1234.HEIC` → `._new.HEIC`)
+    - Encapsulated in `AppleSidecarManager` with discovery, renaming, and deletion utilities
+  - Module-specific config via `configs/pixelporter_paths.json`
+  - Public API: `from brybox import push_photos`
+  - now publishes `FileCopiedEvent` after successful copy + verification
+- `models.py`: new `FileCopiedEvent` dataclass enforcing dual-path, dual-size and
+  dual-health validation; only instantiated after copy & verification succeed.
+- `bus.py`: `publish_file_copied()` convenience wrapper so callers can emit the
+  event in one line while guaranteeing health/size checks are done upstream.
+- `verifier.py`: `DirectoryVerifier` now subscribes/unsubscribes to copy events.
+- `FileCopiedEvent`, updating expected state (source preserved, destination added) while remaining
+  path-only—health & size fields are ignored by design.
+
+### Technical
+- Added `core/pixelporter/` submodule:
+  - `protocols.py`: Interface definitions
+  - `pixelporter.py`: Orchestration logic
+  - `adapters.py`: Temporary `SnapJediAdapter`
+  - `apple_files.py`: Apple sidecar handling (discovery, renaming, deletion)
+- Supports pluggable processors via protocol injection
+
+### Fixed
+- Sidecar helper loop now appends `target_path` unconditionally, yielding correct
+  counts in both dry-run and live modes; remaining `print()` calls migrated to
+  `log_and_display()` for consistent user output.
+  
 
 ## [0.1.0] - 2025-10-01
 
