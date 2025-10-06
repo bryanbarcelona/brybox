@@ -35,21 +35,30 @@ class FileProcessor(Protocol):
 
 
 class Deduplicator(Protocol):
-    """Interface for deduplication strategies."""
+    """Interface for file deduplication via content hashing."""
     
-    def find_duplicates(
-        self, 
-        source_files: list[Path], 
-        target_dir: Path
-    ) -> set[Path]:
+    def group_by_hash(self, files: list[Path]) -> dict[str, list[Path]]:
         """
-        Identify files that should be skipped (duplicates).
+        Group files by content hash.
+        
+        Computes a hash (e.g., SHA-256) for each file and groups files
+        with identical content together.
         
         Args:
-            source_files: List of files to check
-            target_dir: Target directory to check against
+            files: List of file paths to analyze
             
         Returns:
-            Set of source file paths that are duplicates and should be skipped
+            Dict mapping hash string -> list of file paths with that hash.
+            Files with unique content will have a list with one element.
+            
+        Example:
+            {
+                "abc123def...": [Path("photo1.jpg")],  # Unique
+                "789ghi456...": [  # Duplicates
+                    Path("photo2.jpg"),
+                    Path("photo2_copy.jpg"),
+                    Path("photo2_backup.jpg")
+                ]
+            }
         """
         ...

@@ -6,35 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - **PixelPorter**: Photo ingestion module (refactored from pre-repo legacy DropBoss code)
   - Protocol-based architecture with `FileProcessor` and `Deduplicator` interfaces
+  - Three-phase pipeline: staging → deduplication/timestamp fixing → processing/cleanup
   - Dry-run mode, collision detection, and automatic filename resolution
   - Full Apple sidecar support:
     - Discovers and migrates regular, hidden (`._`), `_O` edited, and hidden `_O` sidecars
     - Preserves Apple naming conventions during staging (e.g., `._IMG_1234.HEIC` → `._new.HEIC`)
     - Encapsulated in `AppleSidecarManager` with discovery, renaming, and deletion utilities
+  - **Phase 1**: Collision-safe staging with temporary filenames
+    - Publishes `FileCopiedEvent` after successful copy + verification
+  - **Phase 2**: Deduplication and timestamp uniqueness
+    - `HashDeduplicator`: SHA-256 based duplicate detection (enabled by default)
+    - Automatic EXIF timestamp adjustment to prevent filename collisions
+    - Event publishing for duplicate deletions (DirectoryVerifier integration)
+    - `deduplicator` parameter: `None` (default), custom instance, or `False` (disabled)
+  - Module structure: `core/pixelporter/` submodule
+    - `protocols.py`: `FileProcessor` and `Deduplicator` interface definitions
+    - `pixelporter.py`: Orchestration logic (Phases 1-2 complete, Phase 3 pending)
+    - `adapters.py`: Temporary `SnapJediAdapter`
+    - `apple_files.py`: Apple sidecar handling (discovery, renaming, deletion)
   - Module-specific config via `configs/pixelporter_paths.json`
   - Public API: `from brybox import push_photos`
-  - now publishes `FileCopiedEvent` after successful copy + verification
-- `models.py`: new `FileCopiedEvent` dataclass enforcing dual-path, dual-size and
-  dual-health validation; only instantiated after copy & verification succeed.
-- `bus.py`: `publish_file_copied()` convenience wrapper so callers can emit the
-  event in one line while guaranteeing health/size checks are done upstream.
-- `verifier.py`: `DirectoryVerifier` now subscribes/unsubscribes to copy events.
-- `FileCopiedEvent`, updating expected state (source preserved, destination added) while remaining
-  path-only—health & size fields are ignored by design.
-
-### Technical
-- Added `core/pixelporter/` submodule:
-  - `protocols.py`: Interface definitions
-  - `pixelporter.py`: Orchestration logic
-  - `adapters.py`: Temporary `SnapJediAdapter`
-  - `apple_files.py`: Apple sidecar handling (discovery, renaming, deletion)
-- Supports pluggable processors via protocol injection
+  - Supports pluggable processors and deduplicators via protocol injection
+- `HashDeduplicator` in `utils/deduplicator.py`: SHA-256-based content comparison
+- `FileCopiedEvent` dataclass in `models.py`: enforces dual-path, dual-size and
+  dual-health validation; only instantiated after copy & verification succeed
+- `publish_file_copied()` in `bus.py`: convenience wrapper for emitting copy events
+- `DirectoryVerifier` now subscribes/unsubscribes to copy events, updating expected 
+  state (source preserved, destination added) while remaining path-only—health & 
+  size fields are ignored by design
 
 ### Fixed
 - Sidecar helper loop now appends `target_path` unconditionally, yielding correct
-  counts in both dry-run and live modes; remaining `print()` calls migrated to
-  `log_and_display()` for consistent user output.
-  
+  counts in both dry-run and live modes
+- Remaining `print()` calls migrated to `log_and_display()` for consistent user output
+
+### In Progress
+- PixelPorter Phase 3: SnapJedi processing and source cleanup
+
 
 ## [0.1.0] - 2025-10-01
 
