@@ -8,7 +8,7 @@ from datetime import datetime
 from threading import Lock
 from typing import Any, Callable, Dict, List, Type, TypeVar
 
-from .models import FileMovedEvent, FileDeletedEvent, FileCopiedEvent
+from .models import FileMovedEvent, FileDeletedEvent, FileCopiedEvent, FileRenamedEvent
 
 # Type for event classes
 EventType = TypeVar('EventType')
@@ -160,5 +160,26 @@ def publish_file_copied(source_path: str, destination_path: str,
         source_healthy=source_healthy,
         destination_healthy=destination_healthy,
         timestamp=datetime.now()
+    )
+    event_bus.publish(event)
+
+def publish_file_renamed(old_path: str, new_path: str, 
+                         file_size: int, is_healthy: bool) -> None:
+
+    """
+    Publish a file renamed event.
+    
+    Args:
+        old_path: Original file path
+        new_path: New file path
+        file_size: Size of the file in bytes
+        is_healthy: Whether the destination file passed health checks
+    """
+    event = FileRenamedEvent(
+            old_path=old_path,
+            new_path=new_path,
+            file_size=file_size,
+            destination_healthy=is_healthy,
+            timestamp=datetime.now()
     )
     event_bus.publish(event)

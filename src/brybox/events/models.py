@@ -136,6 +136,48 @@ class FileCopiedEvent:
                 f"src_size={self.source_size}, dst_size={self.destination_size}, "
                 f"src_healthy={self.source_healthy}, dst_healthy={self.destination_healthy})")
     
+@dataclass(frozen=True)
+class FileRenamedEvent:
+    """
+    Published after a file rename operation succeeds.
+    The source file no longer exists, and the destination file must exist and be healthy.
+    """
+    old_path: str
+    new_path: str
+    file_size: int
+    destination_healthy: bool
+    timestamp: datetime
+
+    def __post_init__(self) -> None:
+        if not (self.old_path and self.new_path):
+            raise ValueError("Source and destination paths required")
+        if self.file_size < 0:
+            raise ValueError("File size must be non-negative")
+        if not self.destination_healthy:
+            raise ValueError("Destination file must pass health check")
+
+    @property
+    def old_name(self) -> str:
+        return Path(self.old_path).name
+
+    @property
+    def new_name(self) -> str:
+        return Path(self.new_path).name
+
+    @property
+    def source_dir(self) -> str:
+        return str(Path(self.old_path).parent)
+
+    @property
+    def destination_dir(self) -> str:
+        return str(Path(self.new_path).parent)
+
+    def __repr__(self) -> str:
+        return (f"FileRenamedEvent("
+                f"'{self.old_name}' -> '{self.new_name}', "
+                f"size={self.file_size}, "
+                f"healthy={self.destination_healthy})")
+    
 # ---------------------------------------------------------------------------
 # TODO: Implement FileIgnoredEvent
 # @dataclass(frozen=True)

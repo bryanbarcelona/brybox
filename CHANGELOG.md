@@ -8,40 +8,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   - Protocol-based architecture with `FileProcessor` and `Deduplicator` interfaces
   - Three-phase pipeline: staging → deduplication/timestamp fixing → processing/cleanup
   - Dry-run mode, collision detection, and automatic filename resolution
-  - Full Apple sidecar support:
+  - Module-specific config via `configs/pixelporter_paths.json`
+  - Public API: `from brybox import push_photos`
+  - Supports pluggable processors and deduplicators via protocol injection
+  
+  - **Full Apple sidecar support**:
     - Discovers and migrates regular, hidden (`._`), `_O` edited, and hidden `_O` sidecars
     - Preserves Apple naming conventions during staging (e.g., `._IMG_1234.HEIC` → `._new.HEIC`)
     - Encapsulated in `AppleSidecarManager` with discovery, renaming, and deletion utilities
+    - `AppleSidecarManager.delete_image_with_sidecars()`: Atomic deletion of image + sidecars
+      - Publishes `file_deleted` events for each removed file with accurate sizes
+      - Returns list of deleted paths for verification
+  
   - **Phase 1**: Collision-safe staging with temporary filenames
     - Publishes `FileCopiedEvent` after successful copy + verification
+  
   - **Phase 2**: Deduplication and timestamp uniqueness
     - `HashDeduplicator`: SHA-256 based duplicate detection (enabled by default)
     - Automatic EXIF timestamp adjustment to prevent filename collisions
     - Event publishing for duplicate deletions (DirectoryVerifier integration)
     - `deduplicator` parameter: `None` (default), custom instance, or `False` (disabled)
-  - Module structure: `core/pixelporter/` submodule
+  
+  - **Phase 3**: SnapJedi processing and source cleanup
+    - `_process_and_cleanup()`: Orchestrates temp file processing through SnapJedi adapter
+    - Validates `ProcessResult.success` and `ProcessResult.is_healthy` before deletions
+    - Only deletes source files after confirmed successful processing of staged temps
+    - Per-file error isolation: failures preserve both temp and source for debugging
+    - Comprehensive exception handling with error accumulation in `PushResult.errors`
+    - Publishes `FileRenamedEvent` for temp → final renames
+    - Conditionally executes only if `processor_class` provided
+    - Logs clear message when no processor specified: files remain staged with temp names
+  
+  - **Module structure**: `core/pixelporter/` submodule
     - `protocols.py`: `FileProcessor` and `Deduplicator` interface definitions
-    - `pixelporter.py`: Orchestration logic (Phases 1-2 complete, Phase 3 pending)
-    - `adapters.py`: Temporary `SnapJediAdapter`
-    - `apple_files.py`: Apple sidecar handling (discovery, renaming, deletion)
-  - Module-specific config via `configs/pixelporter_paths.json`
-  - Public API: `from brybox import push_photos`
-  - Supports pluggable processors and deduplicators via protocol injection
-- `HashDeduplicator` in `utils/deduplicator.py`: SHA-256-based content comparison
-- `FileCopiedEvent` dataclass in `models.py`: enforces dual-path, dual-size and
-  dual-health validation; only instantiated after copy & verification succeed
-- `publish_file_copied()` in `bus.py`: convenience wrapper for emitting copy events
-- `DirectoryVerifier` now subscribes/unsubscribes to copy events, updating expected 
-  state (source preserved, destination added) while remaining path-only—health & 
-  size fields are ignored by design
+    - `pixelporter.py`: Orchestration logic (all phases complete)
+    - `adapters.py`: Temporary `SnapJediAdapter` (pre-refactor bridge)
+    - `apple_files.py`: Apple sidecar handling utilities
+
+- **Event System Enhancements**:
+  - `FileCopiedEvent` dataclass: Enforces dual-path, dual-size, and dual-health validation
+    - Only instantiated after copy & verification succeed
+  - `FileRenamedEvent` dataclass: Atomic rename operations
+    - Uses `old_path`/`new_path` semantics (vs source/destination) to reflect single-file nature
+    - Validation ensures destination exists, is healthy, and has non-negative size
+  - `publish_file_copied()` wrapper in `bus.py` for emitting copy events
+  - `publish_file_renamed()` wrapper in `bus.py` for emitting rename events
+
+- **HashDeduplicator** in `utils/deduplicator.py`: SHA-256-based content comparison
+
+- **PushResult tracking**: `processed`, `failed`, and `errors` now populated across all phases
+  - Summary logging at pipeline completion with error details (first 5 shown)
+
+### Changed
+- `DirectoryVerifier` now subscribes to copy and rename events, updating expected state
+  - Remains path-only by design—health & size fields ignored
+- Phase 3 skipped in dry-run mode (consistent with Phases 2a/2b - no files staged to process)
 
 ### Fixed
-- Sidecar helper loop now appends `target_path` unconditionally, yielding correct
-  counts in both dry-run and live modes
-- Remaining `print()` calls migrated to `log_and_display()` for consistent user output
+- Sidecar migration counts now correct in both dry-run and live modes
+  - Helper loop appends `target_path` unconditionally for accurate tracking
+- Migrated remaining `print()` calls to `log_and_display()` for consistent output
+- **AppleSidecarManager & SnapJedi**: Case-insensitive filesystem deduplication
+  - De-duplicates sidecar hits on Windows/macOS where extensions (e.g., `.MOV`/`.mov`) resolve to same file
+  - Uses `Path.resolve()` in set to guarantee one entry per physical file on all platforms
+  - Applied to both `AppleSidecarManager.find_sidecars()` and SnapJedi's internal sidecar detection
+  - Removes redundant existence checks; deduplication now handled in single pass
 
-### In Progress
-- PixelPorter Phase 3: SnapJedi processing and source cleanup
+### Known Issues
+- Phase 2a deduplication does not clean up source duplicates - only removes duplicates in target
+  - Source files remain even when byte-identical copies exist
+  - Will be addressed in future iteration
 
 
 ## [0.1.0] - 2025-10-01

@@ -13,6 +13,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, ClassVar
 
+from .logging import log_and_display, get_configured_logger
+from ..events.bus import publish_file_deleted
+
+logger = get_configured_logger("AppleFiles")
+
 @dataclass(frozen=True)
 class SidecarRename:
     """
@@ -51,47 +56,81 @@ class AppleSidecarManager:
     # Known Apple sidecar extensions (case-insensitive)
     SIDECAR_EXTENSIONS: ClassVar[set[str]] = {'.aae', '.mov', '.xmp'}
 
+    # @staticmethod
+    # def find_sidecars(image_path: Path) -> List[Path]:
+    #     """
+    #     Discover all Apple sidecar files associated with the given image.
+        
+    #     Returns:
+    #         List of existing sidecar file paths (empty if none found).
+    #         Includes regular, hidden, _O, and hidden _O variants.
+    #     """
+    #     sidecars = []
+    #     stem = image_path.stem
+    #     parent = image_path.parent
+
+    #     # 1. Regular sidecars (non-hidden, same stem)
+    #     for ext in AppleSidecarManager.SIDECAR_EXTENSIONS:
+    #         for variant in [ext.lower(), ext.upper()]:
+    #             candidate = parent / f"{stem}{variant}"
+    #             if candidate.exists() and candidate != image_path:
+    #                 sidecars.append(candidate)
+
+    #     # 2. _O edited AAE files (non-hidden)
+    #     o_stem = None
+    #     if '_' in stem:
+    #         o_stem = stem.replace('_', '_O', 1)
+    #         for variant in ['.aae', '.AAE']:
+    #             candidate = parent / f"{o_stem}{variant}"
+    #             if candidate.exists():
+    #                 sidecars.append(candidate)
+
+    #     # 3. Hidden resource forks for original stem (._IMG_1234.*)
+    #     for hidden in parent.glob(f"._{stem}.*"):
+    #         if hidden.exists() and hidden != image_path and hidden not in sidecars:
+    #             sidecars.append(hidden)
+
+    #     # 4. Hidden resource forks for _O stem (._IMG_O1234.*)
+    #     if o_stem:
+    #         for hidden in parent.glob(f"._{o_stem}.*"):
+    #             if hidden.exists() and hidden not in sidecars:
+    #                 sidecars.append(hidden)
+
+    #     return sidecars
+
     @staticmethod
     def find_sidecars(image_path: Path) -> List[Path]:
-        """
-        Discover all Apple sidecar files associated with the given image.
-        
-        Returns:
-            List of existing sidecar file paths (empty if none found).
-            Includes regular, hidden, _O, and hidden _O variants.
-        """
-        sidecars = []
+        """Return *unique* existing sidecar paths for `image_path`."""
+        sidecars: set[Path] = set()          # canonical paths
         stem = image_path.stem
         parent = image_path.parent
 
-        # 1. Regular sidecars (non-hidden, same stem)
-        for ext in AppleSidecarManager.SIDECAR_EXTENSIONS:
-            for variant in [ext.lower(), ext.upper()]:
-                candidate = parent / f"{stem}{variant}"
-                if candidate.exists() and candidate != image_path:
-                    sidecars.append(candidate)
+        # helper: add only if it exists and is not the image itself
+        def _add(candidate: Path) -> None:
+            if candidate.exists() and candidate != image_path:
+                sidecars.add(candidate.resolve())
 
-        # 2. _O edited AAE files (non-hidden)
-        o_stem = None
+        # 1. Regular sidecars (case-insensitive filesystems will auto-dedup via resolve)
+        for ext in AppleSidecarManager.SIDECAR_EXTENSIONS:
+            _add(parent / f"{stem}{ext.lower()}")
+            _add(parent / f"{stem}{ext.upper()}")
+
+        # 2. _O edited AAE files
         if '_' in stem:
             o_stem = stem.replace('_', '_O', 1)
-            for variant in ['.aae', '.AAE']:
-                candidate = parent / f"{o_stem}{variant}"
-                if candidate.exists():
-                    sidecars.append(candidate)
+            _add(parent / f"{o_stem}.aae")
+            _add(parent / f"{o_stem}.AAE")
 
-        # 3. Hidden resource forks for original stem (._IMG_1234.*)
+        # 3. Hidden resource forks (original stem)
         for hidden in parent.glob(f"._{stem}.*"):
-            if hidden.exists() and hidden != image_path and hidden not in sidecars:
-                sidecars.append(hidden)
+            _add(hidden)
 
-        # 4. Hidden resource forks for _O stem (._IMG_O1234.*)
-        if o_stem:
+        # 4. Hidden resource forks (_O stem)
+        if '_' in stem:
             for hidden in parent.glob(f"._{o_stem}.*"):
-                if hidden.exists() and hidden not in sidecars:
-                    sidecars.append(hidden)
+                _add(hidden)
 
-        return sidecars
+        return list(sidecars)
 
     @staticmethod
     def get_renamed_sidecars(image_path: Path, new_stem: str) -> RenamedSidecarGroup:
@@ -175,8 +214,65 @@ class AppleSidecarManager:
             try:
                 sidecar.unlink()
                 deleted.append(sidecar)
-                logger.debug(f"Deleted sidecar: {sidecar.name}")
+                log_and_display(f"Deleted sidecar: {sidecar.name}")
             except Exception as e:
-                logger.warning(f"Failed to delete sidecar {sidecar.name}: {e}")
+                log_and_display(f"Failed to delete sidecar {sidecar.name}: {e}")
         
+        return deleted
+    
+    @staticmethod
+    def delete_image_with_sidecars(
+        image_path: Path,
+    ) -> list[Path]:
+        """
+        Delete an image file and all its Apple sidecars.
+        
+        Args:
+            image_path: Path to the primary image file
+            publish_events: If True, publish file_deleted events for each deletion
+            
+        Returns:
+            List of all deleted file paths (image + sidecars)
+            
+        Example:
+            >>> deleted = AppleSidecarManager.delete_image_with_sidecars(
+            ...     Path("source/IMG_1234.HEIC"),
+            ...     publish_events=True
+            ... )
+            >>> print(f"Deleted {len(deleted)} files")
+        """
+        
+        
+        deleted = []
+        
+        # Find all sidecars first
+        sidecars = AppleSidecarManager.find_sidecars(image_path)
+        
+        # Delete sidecars
+        for sidecar in sidecars:
+            try:
+                size = sidecar.stat().st_size
+                sidecar.unlink()
+                deleted.append(sidecar)
+                
+
+                publish_file_deleted(str(sidecar), size)
+
+                log_and_display(f"Deleted sidecar: {sidecar.name}")
+            except Exception as e:
+                log_and_display(f"Failed to delete sidecar {sidecar.name}: {e}")
+
+        # Delete primary image
+        try:
+            size = image_path.stat().st_size
+            image_path.unlink()
+            deleted.append(image_path)
+            
+
+            publish_file_deleted(str(image_path), size)
+
+            log_and_display(f"Deleted image: {image_path.name}")
+        except Exception as e:
+            log_and_display(f"Failed to delete image {image_path.name}: {e}")
+
         return deleted

@@ -11,12 +11,21 @@ import subprocess
 
 from ...utils.config_loader import ConfigLoader
 from ...utils.logging import log_and_display, get_configured_logger
-from ...events.bus import publish_file_moved, publish_file_deleted, publish_file_copied
+from ...utils.health_check import is_image_healthy
+from ...events.bus import publish_file_moved, publish_file_deleted, publish_file_copied, publish_file_renamed
 from ...utils.apple_files import AppleSidecarManager
 from .protocols import FileProcessor, Deduplicator, ProcessResult
 
 logger = get_configured_logger("PixelPorter")
 
+class PushResult:
+    """Result of push_photos operation."""
+    def __init__(self):
+        self.processed = 0
+        self.skipped = 0
+        self.failed = 0
+        self.duplicates_removed = 0
+        self.errors: list[str] = []
 
 def _is_valid_image(file_path: Path) -> bool:
     """
@@ -382,14 +391,122 @@ def _fix_overlapping_timestamps(
     else:
         log_and_display("No timestamp collisions detected", log=False)
 
-class PushResult:
-    """Result of push_photos operation."""
-    def __init__(self):
-        self.processed = 0
-        self.skipped = 0
-        self.failed = 0
-        self.duplicates_removed = 0
-        self.errors: list[str] = []
+def _process_and_cleanup(
+    mappings: list[tuple[Path, Path, list[Path]]],
+    processor_class: type[FileProcessor],
+    dry_run: bool,
+    action_prefix: str,
+    result: PushResult
+) -> None:
+    """
+    Process temp files and clean up sources (Phase 3).
+    
+    For each staged file:
+    1. Process temp image with SnapJedi (convert HEIC→JPG, rename by timestamp)
+    2. On success: delete source image + source sidecars
+    3. On failure: keep everything for debugging
+    
+    Args:
+        mappings: List of (source_path, temp_image_path, temp_sidecar_paths)
+        processor_class: Class implementing FileProcessor protocol
+        dry_run: Simulation mode
+        action_prefix: Logging prefix
+        result: PushResult to update with stats
+    """
+    if dry_run:
+        log_and_display(
+            f"{action_prefix} Processing: Skipped (runs on staged files only)",
+            log=False
+        )
+        log_and_display(
+            f"{action_prefix} Would process {len(mappings)} image(s) with SnapJedi",
+            log=False
+        )
+        return
+    
+    if not mappings:
+        log_and_display("No files to process", log=False)
+        return
+    
+    log_and_display(f"Processing {len(mappings)} image(s) with SnapJedi...")
+    
+    for source_path, temp_image_path, _temp_sidecar_paths in mappings:
+        try:
+            # Instantiate processor
+            processor = processor_class()
+            
+            # Open temp file
+            processor.open(temp_image_path)
+            
+            # Process (convert/rename)
+            process_result: ProcessResult = processor.process()
+            
+            # Check success
+            if not process_result.success:
+                error_msg = process_result.error_message or "Unknown error"
+                log_and_display(
+                    f"✗ Processing failed: {temp_image_path.name} - {error_msg}",
+                    level="error"
+                )
+                result.failed += 1
+                result.errors.append(f"{temp_image_path.name}: {error_msg}")
+                continue
+            
+            # Check health
+            if not process_result.is_healthy:
+                log_and_display(
+                    f"✗ Health check failed: {temp_image_path.name}",
+                    level="error"
+                )
+                result.failed += 1
+                result.errors.append(f"{temp_image_path.name}: Health check failed")
+                continue
+            
+            # Verify output exists
+            if not process_result.target_path.exists():
+                log_and_display(
+                    f"✗ Output file missing: {process_result.target_path.name}",
+                    level="error"
+                )
+                result.failed += 1
+                result.errors.append(f"{temp_image_path.name}: Output file not found")
+                continue
+            
+            # Success - publish rename event
+            publish_file_renamed(
+                old_path=str(temp_image_path),
+                new_path=str(process_result.target_path),
+                file_size=process_result.target_path.stat().st_size,
+                is_healthy=process_result.is_healthy
+            )
+            
+            # Clean up source (image + sidecars)
+            deleted_files = AppleSidecarManager.delete_image_with_sidecars(source_path)
+            
+            # Log success
+            sidecar_count = len(deleted_files) - 1  # Subtract the image itself
+            log_and_display(
+                f"✓ Processed: {source_path.name} → {process_result.target_path.name} "
+                f"(cleaned {sidecar_count} sidecar(s))"
+            )
+            
+            result.processed += 1
+            
+        except Exception as e:
+            error_msg = f"Exception processing {temp_image_path.name}: {e}"
+            log_and_display(f"✗ {error_msg}", level="error")
+            logger.error(error_msg, exc_info=True)
+            result.failed += 1
+            result.errors.append(error_msg)
+            continue
+    
+    # Summary
+    if result.failed > 0:
+        log_and_display(
+            f"⚠️  Processing completed with {result.failed} failure(s)",
+            level="warning"
+        )
+
 
 
 def _load_pixelporter_config(
@@ -466,12 +583,33 @@ def push_photos(
     if ensure_unique_timestamps:
         _fix_overlapping_timestamps(mappings, dry_run, action_prefix)
     
-    # # Phase 3: Process and cleanup
-    # _process_and_cleanup(mappings, processor_class, dry_run, action_prefix, result)
+    # Phase 3: Process and cleanup (if processor provided)
+    if processor_class:
+        _process_and_cleanup(mappings, processor_class, dry_run, action_prefix, result)
+    else:
+        log_and_display(
+            f"{action_prefix} No processor provided, files remain staged with temp names",
+            log=False
+        )
     
     # Summary
-    #log_and_display(...)
-    
+    log_and_display(
+        f"\n{action_prefix} ✅ Summary: "
+        f"Processed: {result.processed}, "
+        f"Duplicates removed: {result.duplicates_removed}, "
+        f"Failed: {result.failed}"
+    )
+
+    if result.failed > 0:
+        log_and_display(f"⚠️  {result.failed} error(s) occurred:", level="warning")
+        for error in result.errors[:5]:  # Show first 5 errors
+            log_and_display(f"  - {error}", level="warning")
+        if len(result.errors) > 5:
+            log_and_display(f"  ... and {len(result.errors) - 5} more", level="warning")
+
+    if dry_run:
+        log_and_display("💡 Run with dry_run=False to apply changes.")
+
     return result
 
 # NOTE: Legacy implementation preserved during refactoring to 3-phase architecture.

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Set, Optional
 
 from .bus import event_bus
-from .models import FileMovedEvent, FileDeletedEvent, FileCopiedEvent
+from .models import FileMovedEvent, FileDeletedEvent, FileCopiedEvent, FileRenamedEvent
 from ..utils.logging import log_and_display, get_configured_logger
 
 logger = get_configured_logger("DirectoryVerifier")
@@ -45,8 +45,9 @@ class DirectoryVerifier:
         event_bus.subscribe(FileMovedEvent, self._handle_file_moved)
         event_bus.subscribe(FileDeletedEvent, self._handle_file_deleted)
         event_bus.subscribe(FileCopiedEvent, self._handle_file_copied)
+        event_bus.subscribe(FileRenamedEvent, self._handle_file_renamed)
         
-        logger.info(f"Initialized verifier - Source: {len(self.initial_source_files)} files, "
+        logger.debug(f"Initialized verifier - Source: {len(self.initial_source_files)} files, "
                    f"Target: {len(self.initial_target_files)} files")
     
     def _scan_directory(self, directory: str) -> Set[str]:
@@ -86,9 +87,9 @@ class DirectoryVerifier:
         
         # File should now be in destination location
         self.expected_target_files.add(dest_path)
-        
+
         logger.debug(f"Move event: {Path(source_path).name} -> {Path(dest_path).name}")
-    
+
     def _handle_file_deleted(self, event: FileDeletedEvent) -> None:
         """
         Handle FileDeletedEvent by updating expected filesystem state.
@@ -116,6 +117,39 @@ class DirectoryVerifier:
 
         logger.debug(f"Copy event: {Path(dest_path).name} added to target")
 
+    def _handle_file_renamed(self, event: FileRenamedEvent) -> None:
+        """
+        Handle FileRenamedEvent by updating expected filesystem state.
+        
+        Renaming is treated as an in-place operation: the file stays in the same
+        directory but changes its name.  We therefore:
+          1. Remove the old path from the expected set it currently belongs to.
+          2. Add the new path to that same set.
+        
+        Args:
+            event: File rename event with old_path and new_path.
+        """
+        old_path = str(Path(event.old_path).resolve())
+        new_path = str(Path(event.new_path).resolve())
+
+        # Determine which expected set contains the old path
+        if old_path in self.expected_source_files:
+            self.expected_source_files.discard(old_path)
+            self.expected_source_files.add(new_path)
+            logger.debug(f"Rename event (source): {Path(old_path).name} -> {Path(new_path).name}")
+        elif old_path in self.expected_target_files:
+            self.expected_target_files.discard(old_path)
+            self.expected_target_files.add(new_path)
+            logger.debug(f"Rename event (target): {Path(old_path).name} -> {Path(new_path).name}")
+        else:
+            # Edge-case: rename of an untracked file; treat as a new file in the
+            # directory implied by new_path.
+            if new_path.startswith(self.source_dir):
+                self.expected_source_files.add(new_path)
+            elif new_path.startswith(self.target_dir):
+                self.expected_target_files.add(new_path)
+            logger.debug(f"Rename event (untracked): {Path(old_path).name} -> {Path(new_path).name}")
+
     def report(self) -> bool:
         """
         Verify actual filesystem state matches expected state based on events.
@@ -140,11 +174,11 @@ class DirectoryVerifier:
         
         # Summary report
         if overall_success:
-            logger.info(f"✓ Verification passed - Source: {len(actual_source_files)} files, "
+            log_and_display(f"✓ Verification passed - Source: {len(actual_source_files)} files, "
                        f"Target: {len(actual_target_files)} files")
         else:
-            logger.warning(f"✗ Verification failed - check file locations above")
-        
+            log_and_display("✗ Verification failed - check file locations above")
+
         return overall_success
     
     def _verify_directory(self, dir_name: str, expected: Set[str], actual: Set[str]) -> bool:
@@ -163,20 +197,20 @@ class DirectoryVerifier:
         unexpected_files = actual - expected
         
         if not missing_files and not unexpected_files:
-            logger.debug(f"✓ {dir_name} directory verification passed")
+            log_and_display(f"✓ {dir_name} directory verification passed")
             return True
         
         # Report discrepancies
         if missing_files:
-            logger.warning(f"✗ Missing files in {dir_name} directory:")
+            log_and_display(f"✗ Missing files in {dir_name} directory:")
             for file_path in sorted(missing_files):
-                logger.warning(f"  - {Path(file_path).name}")
+                log_and_display(f"  - {Path(file_path).name}")
         
         if unexpected_files:
-            logger.warning(f"✗ Unexpected files in {dir_name} directory:")
+            log_and_display(f"✗ Unexpected files in {dir_name} directory:")
             for file_path in sorted(unexpected_files):
-                logger.warning(f"  + {Path(file_path).name}")
-        
+                log_and_display(f"  + {Path(file_path).name}")
+
         return False
     
     def get_stats(self) -> dict:
@@ -205,4 +239,5 @@ class DirectoryVerifier:
         event_bus.unsubscribe(FileMovedEvent, self._handle_file_moved)
         event_bus.unsubscribe(FileDeletedEvent, self._handle_file_deleted)
         event_bus.unsubscribe(FileCopiedEvent, self._handle_file_copied)
+        event_bus.unsubscribe(FileRenamedEvent, self._handle_file_renamed)
         logger.debug("Unsubscribed from file operation events")
