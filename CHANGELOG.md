@@ -41,9 +41,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   
   - **Module structure**: `core/pixelporter/` submodule
     - `protocols.py`: `FileProcessor` and `Deduplicator` interface definitions
-    - `pixelporter.py`: Orchestration logic (all phases complete)
+    - `orchestrator.py`: Main `push_photos()` entry point, `PushResult`, config/defaults
+    - `staging.py`: Phase 1 implementation
+    - `deduplication.py`: Phase 2a implementation
+    - `timestamps.py`: Phase 2b implementation
+    - `processing.py`: Phase 3 implementation
     - `adapters.py`: Temporary `SnapJediAdapter` (pre-refactor bridge)
     - `apple_files.py`: Apple sidecar handling utilities
+    - `__init__.py`: Clean public API exports
 
 - **Event System Enhancements**:
   - `FileCopiedEvent` dataclass: Enforces dual-path, dual-size, and dual-health validation
@@ -64,20 +69,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   - Remains path-only by design—health & size fields ignored
 - Phase 3 skipped in dry-run mode (consistent with Phases 2a/2b - no files staged to process)
 
-### Fixed
-- Sidecar migration counts now correct in both dry-run and live modes
-  - Helper loop appends `target_path` unconditionally for accurate tracking
-- Migrated remaining `print()` calls to `log_and_display()` for consistent output
-- **AppleSidecarManager & SnapJedi**: Case-insensitive filesystem deduplication
-  - De-duplicates sidecar hits on Windows/macOS where extensions (e.g., `.MOV`/`.mov`) resolve to same file
-  - Uses `Path.resolve()` in set to guarantee one entry per physical file on all platforms
-  - Applied to both `AppleSidecarManager.find_sidecars()` and SnapJedi's internal sidecar detection
-  - Removes redundant existence checks; deduplication now handled in single pass
-
 ### Known Issues
-- Phase 2a deduplication does not clean up source duplicates - only removes duplicates in target
-  - Source files remain even when byte-identical copies exist
-  - Will be addressed in future iteration
+- HEIC files use size-only health checks in Phase 1 staging
+  - Not yet registered in `_FILETYPE_CHECKERS` mimetype dispatcher
+  - Will be addressed when HEIC validation is implemented in health checker utilities
 
 
 ## [0.1.0] - 2025-10-01

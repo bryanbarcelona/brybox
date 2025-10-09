@@ -19,7 +19,7 @@ def is_pdf_healthy(file_path: str | Path) -> bool:
     except Exception:
         return False
 
-
+# TODO: Extend with more image check support (e.g. HEIC)
 def is_image_healthy(file_path: str | Path) -> bool:
     file_path = Path(file_path)
     if not file_path.exists() or file_path.stat().st_size == 0:

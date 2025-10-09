@@ -83,8 +83,8 @@ def test_pixelporter():
     # Run PixelPorter (dry run first)
     print("=== DRY RUN ===")
     result = push_photos(
-        source=source_dir,
-        target=target_dir,
+        #source=source_dir,
+        #target=target_dir,
         dry_run=True
     )
     
@@ -93,8 +93,8 @@ def test_pixelporter():
     # Real run
     print("\n=== REAL RUN ===")
     result = push_photos(
-        source=source_dir,
-        target=target_dir,
+        #source=source_dir,
+        #target=target_dir,
         dry_run=False
     )
     
