@@ -56,47 +56,6 @@ class AppleSidecarManager:
     # Known Apple sidecar extensions (case-insensitive)
     SIDECAR_EXTENSIONS: ClassVar[set[str]] = {'.aae', '.mov', '.xmp'}
 
-    # @staticmethod
-    # def find_sidecars(image_path: Path) -> List[Path]:
-    #     """
-    #     Discover all Apple sidecar files associated with the given image.
-        
-    #     Returns:
-    #         List of existing sidecar file paths (empty if none found).
-    #         Includes regular, hidden, _O, and hidden _O variants.
-    #     """
-    #     sidecars = []
-    #     stem = image_path.stem
-    #     parent = image_path.parent
-
-    #     # 1. Regular sidecars (non-hidden, same stem)
-    #     for ext in AppleSidecarManager.SIDECAR_EXTENSIONS:
-    #         for variant in [ext.lower(), ext.upper()]:
-    #             candidate = parent / f"{stem}{variant}"
-    #             if candidate.exists() and candidate != image_path:
-    #                 sidecars.append(candidate)
-
-    #     # 2. _O edited AAE files (non-hidden)
-    #     o_stem = None
-    #     if '_' in stem:
-    #         o_stem = stem.replace('_', '_O', 1)
-    #         for variant in ['.aae', '.AAE']:
-    #             candidate = parent / f"{o_stem}{variant}"
-    #             if candidate.exists():
-    #                 sidecars.append(candidate)
-
-    #     # 3. Hidden resource forks for original stem (._IMG_1234.*)
-    #     for hidden in parent.glob(f"._{stem}.*"):
-    #         if hidden.exists() and hidden != image_path and hidden not in sidecars:
-    #             sidecars.append(hidden)
-
-    #     # 4. Hidden resource forks for _O stem (._IMG_O1234.*)
-    #     if o_stem:
-    #         for hidden in parent.glob(f"._{o_stem}.*"):
-    #             if hidden.exists() and hidden not in sidecars:
-    #                 sidecars.append(hidden)
-
-    #     return sidecars
 
     @staticmethod
     def find_sidecars(image_path: Path) -> List[Path]:

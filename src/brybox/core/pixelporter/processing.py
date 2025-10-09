@@ -1,5 +1,6 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ...utils.logging import log_and_display
 from ...events.bus import publish_file_renamed
@@ -113,7 +114,6 @@ def _process_and_cleanup(
         except Exception as e:
             error_msg = f"Exception processing {temp_image_path.name}: {e}"
             log_and_display(f"✗ {error_msg}", level="error")
-            logger.error(error_msg, exc_info=True)
             result.failed += 1
             result.errors.append(error_msg)
             continue

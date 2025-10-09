@@ -93,17 +93,31 @@ def push_photos(
     if not dry_run:
         target.mkdir(parents=True, exist_ok=True)
     
-    # Get default processor
-    if processor_class is None:
+    # ------------------------------------------------------------------
+    # TODO: Replace overloaded processor_class with keyword-only
+    #       run_processor: bool = True
+    #       processor: type[FileProcessor] | None = None
+    #       in next major version to remove union-with-bool.
+    # ------------------------------------------------------------------
+    if processor_class is True:
         processor_class = _get_default_processor()
     elif processor_class is False:
         processor_class = None
-    
-    # Get default deduplicator
-    if deduplicator is None:
+    elif processor_class is None:
+        processor_class = _get_default_processor()
+
+    # ------------------------------------------------------------------
+    # TODO: Replace overloaded deduplicator with keyword-only
+    #       run_deduplication: bool = True
+    #       deduplicator: Deduplicator | None = None
+    #       in next major version to remove union-with-bool.
+    # ------------------------------------------------------------------
+    if deduplicator is True:
         deduplicator = _get_default_deduplicator()
     elif deduplicator is False:
         deduplicator = None
+    elif deduplicator is None:
+        deduplicator = _get_default_deduplicator()
 
     result = PushResult()
     

@@ -24,7 +24,7 @@ class FileProcessor(Protocol):
         """
         ...
 
-    def rename_jpg(self) -> ProcessResult:
+    def process(self) -> ProcessResult:
         """
         Process image data and return the result.
                    

@@ -1,13 +1,15 @@
+from __future__ import annotations
 from pathlib import Path
 
 from ...utils.logging import log_and_display
 from ...events.bus import publish_file_deleted
 from ...utils.apple_files import AppleSidecarManager
+from .protocols import Deduplicator
 
 
 def _remove_duplicates(
     mappings: list[tuple[Path, Path, list[Path]]],
-    deduplicator,
+    deduplicator: Deduplicator,
     dry_run: bool,
     action_prefix: str,
     result
