@@ -171,7 +171,9 @@ class AppleSidecarManager:
         
         for sidecar in sidecars:
             try:
+                size = sidecar.stat().st_size
                 sidecar.unlink()
+                publish_file_deleted(str(sidecar), size)
                 deleted.append(sidecar)
                 log_and_display(f"Deleted sidecar: {sidecar.name}")
             except Exception as e:
@@ -200,8 +202,6 @@ class AppleSidecarManager:
             ... )
             >>> print(f"Deleted {len(deleted)} files")
         """
-        
-        
         deleted = []
         
         # Find all sidecars first
@@ -213,10 +213,7 @@ class AppleSidecarManager:
                 size = sidecar.stat().st_size
                 sidecar.unlink()
                 deleted.append(sidecar)
-                
-
                 publish_file_deleted(str(sidecar), size)
-
                 log_and_display(f"Deleted sidecar: {sidecar.name}")
             except Exception as e:
                 log_and_display(f"Failed to delete sidecar {sidecar.name}: {e}")
@@ -226,10 +223,7 @@ class AppleSidecarManager:
             size = image_path.stat().st_size
             image_path.unlink()
             deleted.append(image_path)
-            
-
             publish_file_deleted(str(image_path), size)
-
             log_and_display(f"Deleted image: {image_path.name}")
         except Exception as e:
             log_and_display(f"Failed to delete image {image_path.name}: {e}")

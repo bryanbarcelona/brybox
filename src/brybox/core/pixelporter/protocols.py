@@ -1,15 +1,9 @@
 """Protocol definitions for PixelPorter's pluggable components."""
 
-from typing import Protocol, NamedTuple
+from typing import Protocol
 from pathlib import Path
 
-
-class ProcessResult(NamedTuple):
-    """Result of processing a single file."""
-    success: bool
-    target_path: Path
-    is_healthy: bool
-    error_message: str = ""
+from ..models import ProcessResult
 
 
 class FileProcessor(Protocol):

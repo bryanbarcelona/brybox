@@ -25,6 +25,9 @@ logs/
 # Legacy backup files
 legacy/
 
+# assets
+assets/
+
 # Config files (sensitive)
 
 configs/*.json

@@ -39,8 +39,10 @@ def _load_pixelporter_config(
 def _get_default_processor():
     """Lazy-load SnapJedi adapter as default processor."""
     try:
-        from .adapters import SnapJediAdapter
-        return SnapJediAdapter
+        # from .adapters import SnapJediAdapter
+        # return SnapJediAdapter
+        from ..snap_jedi import SnapJedi
+        return SnapJedi
     except ImportError:
         logger.warning("SnapJedi not available, files will be moved as-is")
         return None

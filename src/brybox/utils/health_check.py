@@ -50,7 +50,7 @@ def is_healthy(file_path: str | Path) -> bool:
         return False
 
     mime, _ = mimetypes.guess_type(str(file_path))
-    checker = _FILETYPE_CHECKERS.get(mime)
+    checker = _FILETYPE_CHECKERS.get(mime) if mime else None
     if checker is None:
         # default fallback: check existence & size only
         return file_path.stat().st_size > 0

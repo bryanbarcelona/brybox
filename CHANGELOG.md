@@ -4,6 +4,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **SnapJedi**: Image-normalization submodule (newly extracted from monolithic legacy codebase)
+  - `ImageConverter` ABC + `ImageMagickConverter` implementation
+    - Auto-detects ImageMagick 6 vs 7 CLI syntax
+    - 30 s subprocess timeout, raises `ConversionError` on failure
+    - Preserves EXIF, GPS, color profiles during HEIC→JPG conversion
+  - `MetadataReader`
+    - Wraps exiftool (bundled or PATH)
+    - Returns `ImageMetadata` dataclass: creation date, GPS lat/lon/alt, timezone, UTC offset
+  - `PathStrategy`
+    - Generates timestamp-based filename (`%Y%m%d %H%M%S.jpg`) from creation date ± offset
+    - Auto-resolves conflicts with `(1)`, `(2)`… suffixes
+  - `SnapJedi` orchestrator
+    - Single entry: `open(path)` → `process()` pipeline
+    - Deletes Apple sidecars pre- and post-process
+    - Converts HEIC/HEIF → JPG, health-checks result, deletes original on success
+    - Deduplicates against existing target (byte-for-byte compare)
+    - Renames to final timestamp name, publishes `FileRenamedEvent` / `FileDeletedEvent`
+    - Returns `ProcessResult` (success, target_path, is_healthy, error_message)
+    
+  - **Module structure**: `core/snap_jedi/` submodule
+    - `converter.py`: `ImageConverter` ABC and `ImageMagickConverter` implementation
+    - `metadata.py`: `MetadataReader` class and `ImageMetadata` dataclass
+    - `naming.py`: `PathStrategy` static utilities for timestamp-based filenames
+    - `snapjedi.py`: Main `SnapJedi` orchestrator class
+    - `__init__.py`: Clean public API exports
+
 - **PixelPorter**: Photo ingestion module (refactored from pre-repo legacy DropBoss code)
   - Protocol-based architecture with `FileProcessor` and `Deduplicator` interfaces
   - Three-phase pipeline: staging → deduplication/timestamp fixing → processing/cleanup
@@ -11,14 +37,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   - Module-specific config via `configs/pixelporter_paths.json`
   - Public API: `from brybox import push_photos`
   - Supports pluggable processors and deduplicators via protocol injection
-  
-  - **Full Apple sidecar support**:
-    - Discovers and migrates regular, hidden (`._`), `_O` edited, and hidden `_O` sidecars
-    - Preserves Apple naming conventions during staging (e.g., `._IMG_1234.HEIC` → `._new.HEIC`)
-    - Encapsulated in `AppleSidecarManager` with discovery, renaming, and deletion utilities
-    - `AppleSidecarManager.delete_image_with_sidecars()`: Atomic deletion of image + sidecars
-      - Publishes `file_deleted` events for each removed file with accurate sizes
-      - Returns list of deleted paths for verification
   
   - **Phase 1**: Collision-safe staging with temporary filenames
     - Publishes `FileCopiedEvent` after successful copy + verification
@@ -49,6 +67,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
     - `adapters.py`: Temporary `SnapJediAdapter` (pre-refactor bridge)
     - `apple_files.py`: Apple sidecar handling utilities
     - `__init__.py`: Clean public API exports
+
+- **Full Apple sidecar support**:
+  - Discovers and migrates regular, hidden (`._`), `_O` edited, and hidden `_O` sidecars
+  - Preserves Apple naming conventions during staging (e.g., `._IMG_1234.HEIC` → `._new.HEIC`)
+  - Encapsulated in `AppleSidecarManager` with discovery, renaming, and deletion utilities
+  - `AppleSidecarManager.delete_image_with_sidecars()`: Atomic deletion of image + sidecars
+    - Publishes `file_deleted` events for each removed file with accurate sizes
+    - Returns list of deleted paths for verification
 
 - **Event System Enhancements**:
   - `FileCopiedEvent` dataclass: Enforces dual-path, dual-size, and dual-health validation

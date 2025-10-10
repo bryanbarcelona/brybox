@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 from ...utils.logging import log_and_display
 from ...events.bus import publish_file_renamed
 from ...utils.apple_files import AppleSidecarManager
-from .protocols import FileProcessor, ProcessResult
+from ..models import ProcessResult
+from .protocols import FileProcessor#, ProcessResult
 
 if TYPE_CHECKING:
     from .orchestrator import PushResult
