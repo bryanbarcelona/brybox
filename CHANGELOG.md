@@ -3,6 +3,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-10-10
+
 ### Added
 - **SnapJedi**: Image-normalization submodule (newly extracted from monolithic legacy codebase)
   - `ImageConverter` ABC + `ImageMagickConverter` implementation
@@ -22,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
     - Deduplicates against existing target (byte-for-byte compare)
     - Renames to final timestamp name, publishes `FileRenamedEvent` / `FileDeletedEvent`
     - Returns `ProcessResult` (success, target_path, is_healthy, error_message)
-    
+
   - **Module structure**: `core/snap_jedi/` submodule
     - `converter.py`: `ImageConverter` ABC and `ImageMagickConverter` implementation
     - `metadata.py`: `MetadataReader` class and `ImageMetadata` dataclass
