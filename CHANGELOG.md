@@ -1,7 +1,140 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.3.0] - 2025-10-11
+
+### Added - VideoSith Module
+
+#### Overview
+New `VideoSith` module for normalizing video files to timestamped MP4 format with full metadata preservation. Handles MOV → MP4 conversion, intelligent renaming based on EXIF data, and timezone-aware filename generation.
+
+#### Core Features
+- **Video Format Conversion**
+  - MOV to MP4 conversion using FFmpeg
+  - Smart codec strategy: attempts stream copy first (fast), falls back to H.264 re-encoding if needed
+  - Preserves all metadata during conversion (EXIF, GPS, creation dates)
+  - Automatic cleanup of original files after successful conversion
+
+- **Metadata Processing**
+  - Extracts creation dates, GPS coordinates, and timezone information
+  - Calculates video start time by subtracting duration from end time
+  - GPS-based timezone detection using TimezoneFinder
+  - Parses dates from filenames (pattern: `YYYYMMDD_HHMMSS`) as fallback
+  - Determines UTC offsets from timezone or filename comparison
+
+- **Intelligent Naming**
+  - Generates timestamp-based filenames: `YYYYMMDD HHMMSS.mp4`
+  - Applies timezone adjustments when offset available
+  - Adds `_UTC` suffix when timezone cannot be determined
+  - Automatic conflict resolution with numbered suffixes: `(1)`, `(2)`, etc.
+
+- **Apple Integration**
+  - Detects and removes Apple sidecar files (.xmp, .aae, hidden variants)
+  - Cleans up both before and after processing
+
+#### Module Structure
+
+```
+videosith/
+├── __init__.py           # Package exports
+├── converter.py          # FFmpegConverter - video format conversion
+├── metadata.py           # MetadataReader - EXIF extraction
+├── metadata_writer.py    # MetadataWriter - writing metadata to files
+├── naming.py             # PathStrategy - filename generation logic
+└── videosith.py          # VideoSith - main orchestrator
+```
+
+#### Architecture Principles
+- **Single Responsibility**: Each module handles one aspect of processing
+- **Dependency Injection**: All external tools (FFmpeg, ExifTool) injectable
+- **Abstract Interfaces**: `VideoConverter` ABC enables future format support
+- **Stateless Logic**: `PathStrategy` uses pure functions for predictability
+- **Testability**: Components can be mocked/stubbed independently
+
+#### API
+
+**Basic Usage:**
+```python
+from videosith import VideoSith
+
+# Create processor
+processor = VideoSith()
+
+# Convert MOV to MP4
+processor.open("video.mov")
+processor.convert_to_mp4()  # Returns bool
+
+# Rename existing MP4
+processor.open("video.mp4")
+processor.rename_mp4()
+```
+
+**Custom Dependencies:**
+```python
+from videosith import VideoSith, MetadataReader, FFmpegConverter
+
+# Inject custom tool paths
+reader = MetadataReader(exiftool_path="/custom/exiftool")
+converter = FFmpegConverter(ffmpeg_path="/custom/ffmpeg")
+
+processor = VideoSith(
+    metadata_reader=reader,
+    converter=converter
+)
+```
+
+#### Processing Pipeline
+
+**MOV → MP4 Conversion:**
+1. Extract metadata from source MOV
+2. Generate target path based on metadata
+3. Convert to MP4 (stream copy or re-encode)
+4. Write metadata to new MP4
+5. Delete original MOV
+6. Clean up Apple sidecars
+
+**MP4 Renaming:**
+1. Extract metadata from existing MP4
+2. Generate target path based on metadata
+3. Rename file if needed
+4. Write/update metadata
+5. Clean up Apple sidecars
+
+#### Dependencies
+- `exiftool` - Metadata reading/writing
+- `ffmpeg` - Video format conversion
+- `pytz` - Timezone calculations
+- `timezonefinder` - GPS to timezone mapping
+
+#### Error Handling
+- Custom exceptions: `ConversionError`, `MetadataWriteError`
+- Timeout protection on subprocess calls (5-10 minutes)
+- Automatic cleanup on conversion failures
+- Graceful degradation when metadata unavailable
+
+#### Naming Examples
+
+| Scenario | Output Filename |
+|----------|----------------|
+| GPS + timezone data | `20240315 093000.mp4` (local time) |
+| Creation date only | `20240315 143000_UTC.mp4` |
+| No metadata | `original_filename.mp4` |
+| Conflict detected | `20240315 093000(1).mp4` |
+
+#### Technical Details
+- Video start time calculated by subtracting `MediaDuration` from `CreateDate`
+- Timezone offset determined from GPS coordinates using IANA timezone database
+- Fallback offset calculation compares filename date to EXIF date
+- ExifTool commands use shell parsing for complex parameter handling
+- FFmpeg timeouts: 5 min (stream copy), 10 min (re-encode)
+
+#### Future Enhancements
+- Support for additional input formats (AVI, MKV, etc.)
+- Configurable naming patterns
+- Batch processing API
+- Progress callbacks for long conversions
+- Health check validation after conversion
+
 
 ## [0.2.0] - 2025-10-10
 
