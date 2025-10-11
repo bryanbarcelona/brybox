@@ -13,10 +13,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, ClassVar
 
-from .logging import log_and_display, get_configured_logger
+from .logging import log_and_display
 from ..events.bus import publish_file_deleted
 
-logger = get_configured_logger("AppleFiles")
 
 @dataclass(frozen=True)
 class SidecarRename:
