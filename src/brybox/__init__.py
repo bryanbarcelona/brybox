@@ -42,6 +42,8 @@ from .core.inbox_kraken import *
 
 from .core.pixelporter import push_photos
 
+from .core.videosith import *
+
 # Uncomment as you add modules:
 # from .doismith import *
 # _configure_logger("Doismith")

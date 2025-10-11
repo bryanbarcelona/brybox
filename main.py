@@ -9,6 +9,7 @@ from brybox import DoctopusPrimeNexus
 from brybox import fetch_and_process_emails, log_and_display
 from brybox import DirectoryVerifier
 from brybox import push_photos
+from brybox import VideoSith
 
 logger = logging.getLogger("BryBox")
 
@@ -74,8 +75,8 @@ def test_pixelporter():
     log_and_display("Logging is configured.", sticky=True)
 
     # Define paths (adjust to your test directories)
-    source_dir = Path(r"d:\\PixelporterTest\\20251003\\src")
-    target_dir = Path(r"d:\\PixelporterTest\\20251003\\dst")
+    source_dir = Path(r"D:\BryBoxTesting\PixelporterTest\20251003\src")
+    target_dir = Path(r"D:\BryBoxTesting\PixelporterTest\20251003\dst")
 
     # Initialize verifier
     verifier = DirectoryVerifier(str(source_dir), str(target_dir))
@@ -112,6 +113,31 @@ def test_pixelporter():
     print("✅ All operations verified successfully")
     return True
 
+def test_videosith():
+    """Test video processing with VideoSith."""
+    
+    configure_logging()
+    enable_verbose_logging()
+
+    log_and_display("Logging is configured.", sticky=True)
+
+    processor = VideoSith()
+    
+    # Process a MOV file
+    mov_path = Path(r"D:\BryBoxTesting\VideoSithTest\src\Disneyland_134.3gp")
+    
+    if mov_path.exists():
+        processor.file_path = mov_path
+        success = processor.convert_to_mp4()
+        processor.rename_mp4()
+        if success:
+            log_and_display(f"✅ Video processed successfully: {mov_path.name}", sticky=True)
+        else:
+            log_and_display(f"❌ Video processing failed: {mov_path.name}", sticky=True)
+    else:
+        log_and_display(f"❌ Video file does not exist: {mov_path}", sticky=True)
+
 if __name__ == "__main__":
     #main()
-    test_pixelporter()
+    #test_pixelporter()
+    test_videosith()

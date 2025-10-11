@@ -7,7 +7,7 @@ import glob
 import os
 import re
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from string import ascii_uppercase
 from typing import Any, Dict, List, Optional, Type, Union
@@ -46,7 +46,7 @@ class _ProcessingContext:
     base_dir: str
     content: str = ""
     category: Optional[str] = None
-    condensed_lines: List[str] = None
+    condensed_lines: List[str] = field(default_factory=list)
     document_date: Optional[str] = None
     invoice_id: Optional[str] = None
     output_filename: str = ""
@@ -382,7 +382,7 @@ class DoctopusPrime:
         context.document_date = self.metadata_extractor.extract_date(context.condensed_lines)
         context.invoice_id = self.metadata_extractor.extract_invoice_id(context.condensed_lines)
         
-        filename_stem = self._get_filename_component(context.category)
+        filename_stem = self._get_filename_component(context.category or "")
 
         # Build output paths
         context.output_filename = self._build_filename(
@@ -390,9 +390,10 @@ class DoctopusPrime:
         )
         
         if context.category:
-            context.output_filepath = self.file_mover.build_output_path(
+            built_path = self.file_mover.build_output_path(
                 context.category, context.output_filename, self.config, self.pdf_filepath
             )
+            context.output_filepath = built_path or ""
             context.backup_path = self.file_mover.get_backup_path(context.output_filepath)
         
         return context
