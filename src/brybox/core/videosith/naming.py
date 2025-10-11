@@ -1,0 +1,88 @@
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional
+
+
+class PathStrategy:
+    """
+    Determines target filenames for processed videos.
+    
+    Generates timestamp-based filenames and handles conflicts.
+    Stateless - all methods are pure functions.
+    """
+    
+    @staticmethod
+    def generate_target_path(
+        source_path: Path,
+        creation_date: Optional[datetime],
+        time_offset: Optional[int] = None
+    ) -> Path:
+        """
+        Generate target path for a video based on its metadata.
+        
+        Priority:
+        1. If creation_date + time_offset exist: use adjusted timestamp
+        2. If only creation_date exists: use timestamp + "_UTC" suffix
+        3. Otherwise: keep original filename, change to .mp4
+        
+        Args:
+            source_path: Original video path
+            creation_date: Video creation timestamp (naive datetime)
+            time_offset: Timezone offset in hours (e.g., -5 for EST)
+            
+        Returns:
+            Target path with timestamp-based filename or original name
+            
+        Example:
+            >>> PathStrategy.generate_target_path(
+            ...     Path("IMG_1234.MOV"),
+            ...     datetime(2024, 3, 15, 14, 30, 0),
+            ...     time_offset=-5
+            ... )
+            Path("20240315 093000.mp4")
+        """
+        directory = source_path.parent
+        
+        # Case 1: Have both date and offset - apply timezone adjustment
+        if creation_date is not None and time_offset is not None:
+            adjusted_date = creation_date + timedelta(hours=time_offset)
+            base_filename = adjusted_date.strftime('%Y%m%d %H%M%S')
+            target = directory / f"{base_filename}.mp4"
+        
+        # Case 2: Have date but no offset - mark as UTC
+        elif creation_date is not None:
+            base_filename = creation_date.strftime('%Y%m%d %H%M%S')
+            target = directory / f"{base_filename}_UTC.mp4"
+        
+        # Case 3: No metadata - keep original name, change extension
+        else:
+            target = source_path.with_suffix('.mp4')
+        
+        # Handle conflicts
+        return PathStrategy._resolve_conflict(target)
+    
+    @staticmethod
+    def _resolve_conflict(target_path: Path) -> Path:
+        """
+        Resolve filename conflicts by adding (1), (2), etc.
+        
+        Args:
+            target_path: Desired target path
+            
+        Returns:
+            Conflict-free target path
+        """
+        # If target doesn't exist, we're good
+        if not target_path.exists():
+            return target_path
+        
+        # Target exists - find available numbered variant
+        directory = target_path.parent
+        stem = target_path.stem
+        suffix = target_path.suffix
+        
+        counter = 1
+        while (candidate := directory / f"{stem}({counter}){suffix}").exists():
+            counter += 1
+        
+        return candidate
