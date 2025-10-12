@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   - Created protocol-based plugin system for file filters, processors, and metadata fixers
   - Moved photo-specific logic to `porter/pixelporter/` as thin orchestration wrapper
   - Introduced `PorterResult` (replaces `PushResult`) in shared protocols
+- **VideoSith**: Adapted to implement `FileProcessor` protocol
+  - Added `process()` method returning `ProcessResult`
+  - Unified conversion and renaming operations under single interface
+  - Maintains backward compatibility with existing `convert_to_mp4()` and `rename_mp4()` methods
 
 ### Added
 - `porter/_shared/` package with reusable porter components:
@@ -20,6 +24,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   - `processing.py`: Generic file processing and cleanup
   - `file_filters.py`: ImageFileFilter and VideoFileFilter implementations
   - `metadata_fixers.py`: ExifTimestampFixer for photo timestamp collision handling
+- **MotionPorter**: Video ingestion pipeline at `core/porter/motionporter/`
+  - `push_videos()`: Process MOV/MP4 files with staging, dedup, and conversion
+  - Uses `VideoFileFilter` for MOV/MP4 file validation
+  - Integrates VideoSith processor for MOV→MP4 conversion and timestamp-based renaming
+  - Supports same pipeline features as pixelporter (staging, deduplication, sidecar migration)
 
 ### Technical
 - Composition over inheritance: porters use dependency injection, not base classes

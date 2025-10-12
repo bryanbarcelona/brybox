@@ -8,7 +8,8 @@ from brybox import DoctopusPrime
 from brybox import DoctopusPrimeNexus
 from brybox import fetch_and_process_emails, log_and_display
 from brybox import DirectoryVerifier
-from brybox import push_photos
+from brybox import push_photos, push_videos
+from brybox import SnapJedi
 from brybox import VideoSith
 
 logger = logging.getLogger("BryBox")
@@ -98,7 +99,15 @@ def test_pixelporter():
         #target=target_dir,
         dry_run=False
     )
+
+    print(f"\nReal run results: Processed={result.processed}, Skipped={result.skipped}, Failed={result.failed}")
     
+    result = push_videos(
+        # source=source_dir,
+        # target=target_dir,
+        dry_run=False
+    )
+
     print(f"\nReal run results: Processed={result.processed}, Skipped={result.skipped}, Failed={result.failed}")
     
     # Verify

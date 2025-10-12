@@ -22,4 +22,4 @@ class VideoFileFilter:
         return path.suffix.lower() in self.get_extensions()
     
     def get_extensions(self) -> set[str]:
-        return {'.mov', '.mp4'}
+        return {'.mov', '.mp4', '.3gp', '.3g2', '.m4v'}

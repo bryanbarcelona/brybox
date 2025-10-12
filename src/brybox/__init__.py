@@ -6,7 +6,7 @@ import logging
 from logging import NullHandler
 
 # --- PACKAGE METADATA ---
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __author__ = "Bryan Barcelona"
 
 # --- PACKAGE-LEVEL LOGGING CONFIGURATION ---
@@ -33,7 +33,7 @@ from .core.doctopus import DoctopusPrime, DoctopusPrimeNexus
 
 from .core.inbox_kraken import fetch_and_process_emails
 
-from .core.porter import push_photos
+from .core.porter import push_photos, push_videos
 
 from .core.snap_jedi import SnapJedi
 

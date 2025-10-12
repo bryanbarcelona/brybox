@@ -4,13 +4,14 @@ from typing import Optional
 from .naming import PathStrategy
 from .metadata import MetadataReader, VideoMetadata
 from .metadata_writer import MetadataWriter
+from ..models import ProcessResult
 from .converter import FFmpegConverter, ConversionError
 from ...utils.apple_files import AppleSidecarManager
 from ...utils.logging import get_configured_logger
 
 logger = get_configured_logger("VideoSith")
 
-
+print("USING VideoSith")
 class VideoSith:
     """
     Video processor that normalizes videos to timestamped MP4s.
@@ -46,6 +47,29 @@ class VideoSith:
         self._file_path: Optional[Path] = None
         self._metadata: Optional[VideoMetadata] = None
     
+    def process(self) -> ProcessResult:
+        """Process video and return result."""
+        if not self._file_path:
+            return ProcessResult(
+                success=False,
+                target_path=Path(),  # Empty Path instead of None
+                is_healthy=False,
+                error_message="No file path"  # String instead of None
+            )
+        
+        if self._file_path.suffix.lower() == '.mov':
+            success = self.convert_to_mp4()
+        else:
+            self.rename_mp4()
+            success = True
+        
+        return ProcessResult(
+            success=success,
+            target_path=self._file_path,
+            is_healthy=True,
+            error_message="Conversion failed" if not success else ""  # Empty string instead of None
+        )
+
     def convert_to_mp4(self) -> bool:
         """
         Convert MOV file to MP4 and delete the original.
