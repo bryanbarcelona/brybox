@@ -1,6 +1,32 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+
+## [Unreleased]
+
+### Changed
+- **Porter Architecture**: Refactored pixelporter into new `core/porter/` structure
+  - Extracted generic porter pipeline to `porter/_shared/orchestration.py`
+  - Created protocol-based plugin system for file filters, processors, and metadata fixers
+  - Moved photo-specific logic to `porter/pixelporter/` as thin orchestration wrapper
+  - Introduced `PorterResult` (replaces `PushResult`) in shared protocols
+
+### Added
+- `porter/_shared/` package with reusable porter components:
+  - `protocols.py`: FileFilter, MetadataFixer, Deduplicator, FileProcessor protocols
+  - `orchestration.py`: Generic `run_porter_pipeline()` function
+  - `staging.py`: Generic file staging with pluggable file filters
+  - `deduplication.py`: Generic content-based deduplication
+  - `processing.py`: Generic file processing and cleanup
+  - `file_filters.py`: ImageFileFilter and VideoFileFilter implementations
+  - `metadata_fixers.py`: ExifTimestampFixer for photo timestamp collision handling
+
+### Technical
+- Composition over inheritance: porters use dependency injection, not base classes
+- Backward compatible: old `core/pixelporter/` remains temporarily for safety
+- Extensible: prepared for videoporter and audioporter additions
+
+
 ## [0.3.0] - 2025-10-11
 
 ### Added - VideoSith Module

@@ -33,7 +33,7 @@ from .core.doctopus import DoctopusPrime, DoctopusPrimeNexus
 
 from .core.inbox_kraken import fetch_and_process_emails
 
-from .core.pixelporter import push_photos
+from .core.porter import push_photos
 
 from .core.snap_jedi import SnapJedi
 

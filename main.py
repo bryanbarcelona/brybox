@@ -139,5 +139,5 @@ def test_videosith():
 
 if __name__ == "__main__":
     #main()
-    #test_pixelporter()
-    test_videosith()
+    test_pixelporter()
+    #test_videosith()
