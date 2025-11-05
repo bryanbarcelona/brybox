@@ -11,7 +11,7 @@ from ...utils.logging import get_configured_logger
 
 logger = get_configured_logger("VideoSith")
 
-print("USING VideoSith")
+
 class VideoSith:
     """
     Video processor that normalizes videos to timestamped MP4s.

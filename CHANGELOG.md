@@ -2,7 +2,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 
-## [Unreleased]
+## [0.4.0] - 2025-11-95
 
 ### Changed
 - **Porter Architecture**: Refactored pixelporter into new `core/porter/` structure
@@ -29,12 +29,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   - Uses `VideoFileFilter` for MOV/MP4 file validation
   - Integrates VideoSith processor for MOV→MP4 conversion and timestamp-based renaming
   - Supports same pipeline features as pixelporter (staging, deduplication, sidecar migration)
+- **Audiora audio file processing system** - New module for classifying and organizing audio files
+  - `AudioraCore`: Single file processor with metadata extraction and intelligent renaming
+  - `AudioraNexus`: Batch processor for handling multiple audio files
+  - Exiftool integration for reliable Media Created date extraction
+  - Configurable filename pattern matching with case-insensitive triggers
+  - Support for both AND (`all`) and OR (`any`) trigger modes per category
+  - Regex-based filename cleanup and normalization rules
+  - Date validation with fallback from metadata to filename
+  - Duplicate detection via metadata field comparison
+  - Health checking using exiftool verification
+  - Event publishing for file moves and deletions
+  - Dry-run mode for testing without file modifications
+  - Progress tracking for batch operations
+
+- **Configuration files for Audiora**
+  - `configs/audiora_sorting_rules.json`: Main category and rule definitions
+  - `configs/audiora_sorting_rules.example.json`: Example configurations showing extensibility
+  - Extended `configs/paths.json` with `audio_source_dir` and `audio_target_dir`
+
+- **Audiora module structure** (`src/brybox/core/audiora/`)
+  - `audiora.py`: Main processor classes and orchestration
+  - `metadata.py`: Exiftool-based metadata extraction
+  - `filename.py`: Pattern matching, classification, and cleanup
+  - `file_ops.py`: File moving, conflict resolution, and health checks
+  - `__init__.py`: Clean public API exports
 
 ### Technical
 - Composition over inheritance: porters use dependency injection, not base classes
 - Backward compatible: old `core/pixelporter/` remains temporarily for safety
 - Extensible: prepared for videoporter and audioporter additions
+- **Audiora audio file processing system**
+- Follows Doctopus architecture: separation of concerns across specialized classes
+- Reuses existing utilities: `ConfigLoader`, logging, event bus, health checks
+- Matches snap_jedi's exiftool pattern using `ExifToolHelper()` context manager
+- File extensions supported: `.m4a`, `.mp3`, `.flac`, `.wav` (extensible)
+- Date format standardization: YYYYMMDD for consistent sorting
+- Conflict resolution: Automatic (N) suffix for duplicate filenames
+- Zero-dependency metadata extraction via existing exiftool asset
 
+### Configuration Schema
+```json
+{
+  "category_name": {
+    "triggers": ["keyword1", "keyword2"],
+    "trigger_mode": "any|all",
+    "output_path": "relative\\path\\from\\base",
+    "rename_template": "{date} {session_name}",
+    "metadata_source": "media_created",
+    "filename_cleanup": {
+      "remove_patterns": ["regex1", "regex2"],
+      "normalize_patterns": {
+        "regex_pattern": "replacement"
+      }
+    }
+  }
+}
+```
+
+### Future Extensibility
+- TODO: ID3 tag extraction for music files (artist, album, track)
+- TODO: Additional metadata sources beyond Media Created date
+- TODO: Dynamic path placeholders (e.g., `{artist}/{album}`)
+- Module structure supports easy addition of new audio formats and rules
 
 ## [0.3.0] - 2025-10-11
 

@@ -31,6 +31,8 @@ from .events.verifier import DirectoryVerifier
 
 from .core.doctopus import DoctopusPrime, DoctopusPrimeNexus
 
+from .core.audiora import AudioraCore, AudioraNexus
+
 from .core.inbox_kraken import fetch_and_process_emails
 
 from .core.porter import push_photos, push_videos
@@ -54,4 +56,6 @@ __all__ = [
     "push_photos",
     "SnapJedi",
     "VideoSith",
+    "AudioraCore",
+    "AudioraNexus",
 ]

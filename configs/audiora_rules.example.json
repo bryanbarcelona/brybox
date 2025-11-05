@@ -1,0 +1,42 @@
+{
+  "breathwork_sessions": {
+    "triggers": ["chuck mcgee"],
+    "trigger_mode": "any",
+    "output_path": "Audio\\Breathwork\\Sessions",
+    "rename_template": "{date} {session_name}",
+    "metadata_source": "media_created",
+    "filename_cleanup": {
+      "remove_patterns": [
+        "^\\d{2}-\\d{2}-\\d{4}\\s+",
+        "chuck mcgee i{3,4}"
+      ],
+      "normalize_patterns": {
+        "(\\d+)_(\\d+)_(\\d+)_(\\d+)": "\\1-\\2-\\3-\\4"
+      }
+    }
+  },
+  "podcasts": {
+    "triggers": ["joe rogan", "lex fridman", "huberman"],
+    "trigger_mode": "any",
+    "output_path": "Audio\\Podcasts",
+    "rename_template": "{date} {session_name}",
+    "metadata_source": "media_created",
+    "filename_cleanup": {
+      "remove_patterns": [
+        "^\\d{4}-\\d{2}-\\d{2}\\s+"
+      ],
+      "normalize_patterns": {}
+    }
+  },
+  "music": {
+    "triggers": ["artist name", "album name"],
+    "trigger_mode": "all",
+    "output_path": "Audio\\Music\\{artist}\\{album}",
+    "rename_template": "{track_number} {title}",
+    "metadata_source": "id3_tags",
+    "filename_cleanup": {
+      "remove_patterns": [],
+      "normalize_patterns": {}
+    }
+  }
+}
