@@ -4,7 +4,9 @@ import datetime
 from pathlib import Path
 from typing import Optional, List
 import logging
+import os
 
+from ..events.bus import publish_file_added
 from ..utils.health_check import is_pdf_healthy
 from ..utils.logging import log_and_display
 from .models import DownloadResult
@@ -128,6 +130,14 @@ class TechemScraper(BaseScraper):
                 
                 # Verify PDF health
                 if is_pdf_healthy(output_path):
+                    file_size = os.path.getsize(output_path)
+
+                    publish_file_added(
+                        file_path=str(output_path),
+                        file_size=file_size,
+                        is_healthy=True
+                    )
+                                        
                     log_and_display(f"Downloaded: {output_path.name}", log=True, sticky=False)
                     return self._build_result(total_found=1, downloaded=1)
                 else:
@@ -331,10 +341,19 @@ class KfwScraper(BaseScraper):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"kfw_document_{doc_index}_{dokid}_{timestamp}.pdf"
         output_path = Path(self.download_dir) / filename
-        
+
         with open(output_path, "wb") as f:
             f.write(response.body())
         
+        file_size = os.path.getsize(output_path)
+        is_healthy = is_pdf_healthy(output_path)
+
+        publish_file_added(
+            file_path=str(output_path),
+            file_size=file_size,
+            is_healthy=is_healthy
+        )
+
         log_and_display(
             f"Downloaded: {filename} ({len(response.body())} bytes)",
             log=True,

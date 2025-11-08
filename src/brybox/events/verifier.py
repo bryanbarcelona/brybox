@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Set, Optional
 
 from .bus import event_bus
-from .models import FileMovedEvent, FileDeletedEvent, FileCopiedEvent, FileRenamedEvent
+from .models import FileMovedEvent, FileDeletedEvent, FileCopiedEvent, FileRenamedEvent, FileAddedEvent
 from ..utils.logging import log_and_display, get_configured_logger
 
 logger = get_configured_logger("DirectoryVerifier")
@@ -46,6 +46,7 @@ class DirectoryVerifier:
         event_bus.subscribe(FileDeletedEvent, self._handle_file_deleted)
         event_bus.subscribe(FileCopiedEvent, self._handle_file_copied)
         event_bus.subscribe(FileRenamedEvent, self._handle_file_renamed)
+        event_bus.subscribe(FileAddedEvent, self._handle_file_added)
         
         logger.debug(f"Initialized verifier - Source: {len(self.initial_source_files)} files, "
                    f"Target: {len(self.initial_target_files)} files")
@@ -149,6 +150,30 @@ class DirectoryVerifier:
             elif new_path.startswith(self.target_dir):
                 self.expected_target_files.add(new_path)
             logger.debug(f"Rename event (untracked): {Path(old_path).name} -> {Path(new_path).name}")
+
+    def _handle_file_added(self, event: FileAddedEvent) -> None:
+        """
+        Handle FileAddedEvent by updating expected filesystem state.
+        
+        A new file should now appear in the expected target or source set,
+        depending on its location. The file must have passed health checks
+        before this event is published.
+        
+        Args:
+            event: File addition event with file path and metadata
+        """
+        file_path = str(Path(event.file_path).resolve())
+
+        # Determine whether the added file belongs to source or target directory
+        if file_path.startswith(str(Path(self.source_dir).resolve())):
+            self.expected_source_files.add(file_path)
+            logger.debug(f"Add event (source): {Path(file_path).name}")
+        elif file_path.startswith(str(Path(self.target_dir).resolve())):
+            self.expected_target_files.add(file_path)
+            logger.debug(f"Add event (target): {Path(file_path).name}")
+        else:
+            # Unrecognized location — log for investigation
+            logger.warning(f"Add event (untracked): {file_path} not under source or target dirs")
 
     def report(self) -> bool:
         """

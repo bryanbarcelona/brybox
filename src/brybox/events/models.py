@@ -177,6 +177,45 @@ class FileRenamedEvent:
                 f"'{self.old_name}' -> '{self.new_name}', "
                 f"size={self.file_size}, "
                 f"healthy={self.destination_healthy})")
+
+@dataclass(frozen=True)
+class FileAddedEvent:
+    """
+    Event published when a new file is successfully added to the system.
+    
+    This event is published only for successfully created or uploaded files
+    that pass health and integrity checks.
+    """
+    file_path: str
+    file_size: int
+    is_healthy: bool
+    timestamp: datetime
+
+    def __post_init__(self):
+        """Validate event data on creation."""
+        if not self.file_path:
+            raise ValueError("File path cannot be empty")
+        if self.file_size < 0:
+            raise ValueError("File size cannot be negative")
+        if not self.is_healthy:
+            raise ValueError("File must pass health check before publishing event")
+
+    @property
+    def filename(self) -> str:
+        """Get the filename from file path."""
+        return Path(self.file_path).name
+
+    @property
+    def file_dir(self) -> str:
+        """Get the directory from file path."""
+        return str(Path(self.file_path).parent)
+
+    def __repr__(self) -> str:
+        """Human-readable representation for debugging."""
+        return (f"FileAddedEvent("
+                f"'{self.filename}', "
+                f"size={self.file_size}, "
+                f"healthy={self.is_healthy})")
     
 # ---------------------------------------------------------------------------
 # TODO: Implement FileIgnoredEvent

@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 import tempfile
 
+from ..events.bus import publish_file_added
 from ..web_marionette.scrapers import KfwScraper, TechemScraper
 from ..utils.credentials import CredentialsManager, EmailCredentials, WebCredentials
 from ..utils.logging import log_and_display, get_configured_logger, trackerator
@@ -147,6 +148,13 @@ def download_dropbox_audio(body_html: str, save_dir: str) -> list[str]:
                 with open(file_path, 'wb') as f:
                     for chunk in dl_r.iter_content(chunk_size=8192):
                         f.write(chunk)
+            file_size = os.path.getsize(file_path)
+            publish_file_added(
+                file_path=file_path,
+                file_size=file_size,
+                is_healthy=file_size > 0,
+            )
+
             downloaded_files.append(file_path)
             log_and_display(f"Downloaded: {file_path}")
             logger.info(f"Downloaded audio file: {file_path}")
@@ -207,7 +215,8 @@ def parse_email_content(uid: int, raw_message: bytes) -> Meta:
         invoice_link=link,
     )
 
-def get_emails_to_process(mail: imaplib.IMAP4_SSL, mailbox: str = "INBOX", limit: Optional[int] = None) -> List[Tuple[int, bytes]]:
+def get_emails_to_process(mail: imaplib.IMAP4_SSL, mailbox: str = "INBOX", limit: Optional[int] = None, 
+                          progress_bar: bool = True)-> List[Tuple[int, bytes]]:
     """Fetch email UIDs and raw content for processing."""
     mail.select(mailbox)
     
@@ -218,9 +227,12 @@ def get_emails_to_process(mail: imaplib.IMAP4_SSL, mailbox: str = "INBOX", limit
         uids = uids[-limit:]
     
     emails = []
+    uids = trackerator(uids, description="Fetching Emails", final_message="All emails processed!") if progress_bar else uids
+
     for uid in uids:
-        if uid != 43798 and uid != 43672:  # Debug skip
-            continue
+        # TODO: Remove debug skip
+        # if uid != 43798 and uid != 43672:  # Debug skip
+        #     continue
         typ, data = mail.uid('FETCH', str(uid), '(RFC822)')
         raw = data[0][1]
         emails.append((uid, raw))
@@ -240,10 +252,10 @@ def _delete(uid: int, mail: imaplib.IMAP4_SSL) -> None:
     # if status != 'OK':
     #     raise RuntimeError(f"Could not move UID {uid} to {trash_folder}")
     # ----------------------------------------------------------
-
-    raise NotImplementedError(
-        "Delete is disabled for test runs - see TODO in _delete()."
-    )
+    pass
+    # raise NotImplementedError(
+    #     "Delete is disabled for test runs - see TODO in _delete()."
+    # )
 
 # ---------- CLASSIFIER ----------
 
@@ -297,6 +309,8 @@ def download_pdf_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: Optional
     fname = save_path(f"{meta.uid}_{re.sub(r'[^\w\-_\. ]', '_', meta.subject)[:40]}.pdf", save_dir=save_dir)
     with open(fname, "wb") as f:
         f.write(r.content)
+    
+    publish_file_added(file_path=fname, file_size=os.path.getsize(fname), is_healthy=True)
     log_and_display(f"UID {meta.uid} | DOWNLOAD | Downloaded PDF from {meta.invoice_link} to {fname}")
     delete_handler(meta, mail)
 
@@ -316,6 +330,8 @@ def download_attachment_handler(meta: Meta, mail: imaplib.IMAP4_SSL, save_dir: O
             fname = save_path(f"{meta.uid}_{name}", save_dir=save_dir)
             with open(fname, "wb") as f:
                 f.write(payload)
+            publish_file_added(file_path=fname, file_size=os.path.getsize(fname), is_healthy=True)
+            
             log_and_display(f"UID {meta.uid} | DOWNLOAD | Downloaded PDF attachment: {fname}")
             downloaded_any = True
 

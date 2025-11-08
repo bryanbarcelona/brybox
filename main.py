@@ -149,94 +149,6 @@ def test_videosith():
 
 def test_audiora():
 
-    
-    # print("\n" + "="*60)
-    # print("AUDIORA TEST")
-    # print("="*60 + "\n")
-    
-    # # Test directory from your config
-    # test_dir = r"C:\Users\bryan\Downloads\Chuck McGee"
-    
-    # # Test 1: Single file processing
-    # print("TEST 1: Single File Processing")
-    # print("-" * 40)
-    
-    # # Get first audio file from test directory
-    # import glob
-    # audio_files = glob.glob(f"{test_dir}/*.m4a")
-    
-    # if not audio_files:
-    #     print(f"No .m4a files found in {test_dir}")
-    #     return
-    
-
-    # for test_file in audio_files:
-    #     #test_file = audio_files[0]
-    #     print("\n" + "-"*40)
-    #     print(f"Testing with: {test_file}\n")
-        
-    #     # Process single file (dry run first)
-    #     processor = AudioraCore(
-    #         audio_filepath=test_file,
-    #         config_path="configs",
-    #         dry_run=True
-    #     )
-        
-    #     context = processor.process()
-    #     # print(f"Category: {context.category}")
-    #     # print(f"Metadata Date: {context.metadata_date}")
-    #     # print(f"Filename Date: {context.filename_date}")
-    #     # print(f"Validated Date: {context.validated_date}")
-    #     # print(f"Session Name: {context.session_name}")
-    #     # print(f"Output Filename: {context.output_filename}")
-    #     print(f"\nOutput Path: {context.output_filepath}")
-    
-    # # Test 2: Batch processing (dry run)
-    # print("\n" + "="*60)
-    # print("TEST 2: Batch Processing (Dry Run)")
-    # print("-" * 40 + "\n")
-    
-    # nexus = AudioraNexus(
-    #     dir_path=test_dir,
-    #     config_path="configs",
-    #     dry_run=True
-    # )
-    
-    # results = nexus.process_all(progress_bar=True)
-    
-    # # Summary
-    # print("\n" + "="*60)
-    # print("RESULTS SUMMARY")
-    # print("-" * 40)
-    # print(f"Total files processed: {len(results)}")
-    # print(f"Successful: {sum(results.values())}")
-    # print(f"Failed: {len(results) - sum(results.values())}")
-    # print("="*60 + "\n")
-
-    # for result in results:
-    #     print(result)
-    
-    # # Ask user if they want to run for real
-    # response = input("Run actual file moves? (yes/no): ").strip().lower()
-    # if response == 'yes':
-    #     print("\nRunning actual file moves...")
-    #     nexus_real = AudioraNexus(
-    #         dir_path=test_dir,
-    #         config_path="configs",
-    #         dry_run=False
-    #     )
-    #     results_real = nexus_real.process_all(progress_bar=True)
-        
-    #     print("\n" + "="*60)
-    #     print("ACTUAL RUN RESULTS")
-    #     print("-" * 40)
-    #     print(f"Total files processed: {len(results_real)}")
-    #     print(f"Successful: {sum(results_real.values())}")
-    #     print(f"Failed: {len(results_real) - sum(results_real.values())}")
-    #     print("="*60 + "\n")
-    # else:
-    #     print("\nSkipped actual file moves.")
-
     configure_logging()
     enable_verbose_logging()
 
@@ -276,10 +188,15 @@ def test_audiora():
 
     log_and_display("Finished all tasks.", sticky=True)
 
+def test_inbox_kraken():
+    configure_logging()
+    enable_verbose_logging()
 
+    fetch_and_process_emails()
 
 if __name__ == "__main__":
     #main()
     #test_pixelporter()
     #test_videosith()
-    test_audiora()
+    #test_audiora()
+    test_inbox_kraken()
