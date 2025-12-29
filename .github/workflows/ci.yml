@@ -51,8 +51,19 @@ jobs:
       # - name: Type check
       #   run: uvx ty check .
 
+      - name: Check for tests
+        id: check_tests
+        run: |
+          if find tests -name "test_*.py" -o -name "*_test.py" | grep -q .; then
+            echo "has_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_tests=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Test + coverage
+        if: steps.check_tests.outputs.has_tests == 'true'
         run: uv run pytest --cov=himmel --cov-report=xml
 
       - name: Upload coverage
+        if: steps.check_tests.outputs.has_tests == 'true'
         uses: codecov/codecov-action@v4
