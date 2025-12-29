@@ -19,7 +19,6 @@ wheels/
 # .env files
 .env
 .python-version
-uv.lock
 
 # Log folders and files
 logs/
