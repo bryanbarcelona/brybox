@@ -10,320 +10,350 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from string import ascii_uppercase
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any
 
 import pdfplumber
 from dateutil import parser
 
+from brybox.events.bus import publish_file_deleted, publish_file_moved
+from brybox.utils.config_loader import ConfigLoader as _ConfigLoader
+from brybox.utils.health_check import is_healthy
+from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
 
-from ..utils.health_check import is_healthy
-from ..utils.logging import log_and_display, get_configured_logger, trackerator
-from ..utils.config_loader import ConfigLoader as _ConfigLoader
-from ..events.bus import publish_file_moved, publish_file_deleted
-
-logger = get_configured_logger("DoctopusPrime")
+logger = get_configured_logger('DoctopusPrime')
 
 
-def _load_doctopus_config(config_path: Optional[str] = None,
-                          config: Optional[Dict] = None) -> Dict[str, Any]:
+def _load_doctopus_config(config_path: str | None = None, config: dict | None = None) -> dict[str, Any]:
     """Return merged doctopus JSON configs."""
     if config is not None:
         return config
-    config_path = config_path or "configs"
+    config_path = config_path or 'configs'
     return _ConfigLoader.load_configs(
         config_path=config_path,
         config_files={
-            "categories": "doctopus_sorting_rules.json",
-            "extraction_rules": "extraction_rules.json",
-            "metadata_triggers": "metadata_triggers.json"
-        }
+            'categories': 'doctopus_sorting_rules.json',
+            'extraction_rules': 'extraction_rules.json',
+            'metadata_triggers': 'metadata_triggers.json',
+        },
     )
+
 
 @dataclass
 class _ProcessingContext:
     """Holds processing state for a single PDF."""
+
     pdf_filepath: str
     base_dir: str
-    content: str = ""
-    category: Optional[str] = None
-    condensed_lines: List[str] = field(default_factory=list)
-    document_date: Optional[str] = None
-    invoice_id: Optional[str] = None
-    output_filename: str = ""
-    output_filepath: str = ""
-    backup_path: Optional[str] = None
+    content: str = ''
+    category: str | None = None
+    condensed_lines: list[str] = field(default_factory=list)
+    document_date: str | None = None
+    invoice_id: str | None = None
+    output_filename: str = ''
+    output_filepath: str = ''
+    backup_path: str | None = None
     is_new_file: bool = True
 
 
 class _TextProcessor:
     """Handles PDF text extraction and line filtering."""
-    
-    def __init__(self, config: Dict[str, Any]):
+
+    def __init__(self, config: dict[str, Any]):
         self.config = config
-        
+
     def extract_content(self, pdf_path: str) -> str:
         """Extract text content from PDF."""
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 page = pdf.pages[0]
                 text = page.extract_text()
-            return text or ""
+            return text or ''
         except Exception:
-            return ""
-    
-    def reduce_to_relevant_lines(self, content: str) -> List[str]:
+            return ''
+
+    def reduce_to_relevant_lines(self, content: str) -> list[str]:
         """Filter content to relevant lines based on extraction rules."""
-        extraction_rules = self.config.get("extraction_rules", {})
-        
-        months = ["January", "Januar", "February", "Februar", "March", "März", "April", "May", "Mai", "June", "Juni", 
-                 "July", "Juli", "August", "September", "October", "Oktober", "November", "December", "Dezember"]
-        
+        extraction_rules = self.config.get('extraction_rules', {})
+
+        months = [
+            'January',
+            'Januar',
+            'February',
+            'Februar',
+            'March',
+            'März',
+            'April',
+            'May',
+            'Mai',
+            'June',
+            'Juni',
+            'July',
+            'Juli',
+            'August',
+            'September',
+            'October',
+            'Oktober',
+            'November',
+            'December',
+            'Dezember',
+        ]
+
         month_translations = {
-            "January": "Januar", "February": "Februar", "March": "März", "May": "Mai", "June": "Juni", 
-            "July": "Juli", "October": "Oktober", "Oct": "Okt", "December": "Dezember", "Dec": "Dez"
+            'January': 'Januar',
+            'February': 'Februar',
+            'March': 'März',
+            'May': 'Mai',
+            'June': 'Juni',
+            'July': 'Juli',
+            'October': 'Oktober',
+            'Oct': 'Okt',
+            'December': 'Dezember',
+            'Dec': 'Dez',
         }
-        
+
         relevant_lines = []
-        lines = content.split("\n")
-        
+        lines = content.split('\n')
+
         # Replace translated months
         for i, line in enumerate(lines):
             for key, value in month_translations.items():
                 if key not in line:
                     lines[i] = lines[i].replace(value, key)
-        
+
         for i, line in enumerate(lines):
             if any(substring in line for substring in month_translations.keys() | month_translations.values()):
                 relevant_lines.append(line)
-            
+
             for trigger_type, triggers in extraction_rules.items():
                 for trigger in triggers:
                     if trigger in line:
-                        if trigger_type == "same_line":
-                            line = f"{trigger}{line.split(trigger)[-1]}"
-                            relevant_lines.append(line.replace(trigger, "").replace(":", "").strip())
+                        if trigger_type == 'same_line':
+                            line = f'{trigger}{line.split(trigger)[-1]}'
+                            relevant_lines.append(line.replace(trigger, '').replace(':', '').strip())
                             relevant_lines.append(line)
-                        elif trigger_type == "previous_line" and i > 0:
+                        elif trigger_type == 'previous_line' and i > 0:
                             relevant_lines.append(lines[i - 1])
-                        elif trigger_type == "next_line" and i < len(lines) - 1:
+                        elif trigger_type == 'next_line' and i < len(lines) - 1:
                             relevant_lines.append(lines[i + 1])
-            
+
             if any(month.lower() in line.lower() for month in months):
                 relevant_lines.append(line)
-        
+
         return relevant_lines if relevant_lines else lines
 
 
 class _MetadataExtractor:
     """Extracts metadata like dates and invoice IDs."""
-    
-    def __init__(self, config: Dict[str, Any]):
+
+    def __init__(self, config: dict[str, Any]):
         self.config = config
-        
-    def extract_date(self, lines: List[str]) -> Optional[str]:
+
+    def extract_date(self, lines: list[str]) -> str | None:
         """Extract first valid date from lines."""
-        date_patterns = self.config.get("metadata_triggers", {}).get("date_patterns", [])
+        date_patterns = self.config.get('metadata_triggers', {}).get('date_patterns', [])
         if not date_patterns:
             date_patterns = [r'\b(?:\d{1,2}(?:st|nd|rd|th)?[ ./-](?:\d{1,2}|[a-zA-Z]+)[ ./-]\d{2,4})\b']
-        
+
         date_list = []
         for line in lines:
             for pattern in date_patterns:
                 match = re.search(pattern, line)
                 if match:
                     date_list.append(match.group())
-        
+
         for date_str in date_list:
             try:
                 parsed_date = self._parse_date(date_str)
-                return parsed_date.strftime("%Y%m%d")
+                return parsed_date.strftime('%Y%m%d')
             except Exception:
                 continue
-        
+
         return None
-    
+
     def _parse_date(self, line: str) -> Any:
         """Parse date string to datetime object."""
         line = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', line)
-        
+
         if '.' in line:
             return parser.parse(line, dayfirst=True)
         elif '/' in line:
             return parser.parse(line, dayfirst=False)
         else:
             return parser.parse(line, dayfirst=True)
-    
-    def extract_invoice_id(self, lines: List[str]) -> Optional[str]:
+
+    def extract_invoice_id(self, lines: list[str]) -> str | None:
         """Extract invoice ID from lines."""
-        invoice_triggers = self.config.get("metadata_triggers", {}).get("invoice_id", [])
-        
+        invoice_triggers = self.config.get('metadata_triggers', {}).get('invoice_id', [])
+
         for line in lines:
             for trigger in invoice_triggers:
                 if trigger in line:
-                    invoice_number = line.replace(trigger, "").replace(":", "").replace(". ", "").replace(")", "").strip()
-                    invoice_number = invoice_number.split(" ")[0]
+                    invoice_number = (
+                        line.replace(trigger, '').replace(':', '').replace('. ', '').replace(')', '').strip()
+                    )
+                    invoice_number = invoice_number.split(' ')[0]
                     return invoice_number
-        
+
         return None
 
 
 class _SpecialCaseHandler:
     """Handles special case processing for specific categories."""
-    
-    def handle_special_cases(self, category: str, lines: List[str]) -> List[str]:
+
+    def handle_special_cases(self, category: str, lines: list[str]) -> list[str]:
         """Apply special case handling based on category."""
-        if category == "McDonalds Rechnung":
+        if category == 'McDonalds Rechnung':
             return self._handle_mcdonalds(lines)
-        
+
         return lines
-    
-    def _handle_mcdonalds(self, lines: List[str]) -> List[str]:
+
+    def _handle_mcdonalds(self, lines: list[str]) -> list[str]:
         """Handle McDonald's specific date format."""
         date_pattern = r'\b(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/(19|20)\d{2}\b'
-        
+
         for i, line in enumerate(lines):
             match = re.search(date_pattern, line)
             if match:
-                lines[i] = match.group(0).replace("/", ".")
-        
+                lines[i] = match.group(0).replace('/', '.')
+
         return lines
 
 
 class _FileMover:
     """Handles file operations and path management."""
-    
+
     def __init__(self, base_dir: str, dry_run: bool = False):
         self.base_dir = base_dir
         self.dry_run = dry_run
-        
-    def get_backup_path(self, output_filepath: str) -> Optional[str]:
+
+    def get_backup_path(self, output_filepath: str) -> str | None:
         """Generate backup path if backup drive exists."""
         for drive in ascii_uppercase:
-            if os.path.exists(f"{drive}:\\log.backup"):
+            if Path(f'{drive}:\\log.backup').exists():
                 if output_filepath:
-                    backup_path = f"{drive}:{output_filepath.split(':')[1]}"
+                    backup_path = f'{drive}:{output_filepath.split(":")[1]}'
                     return backup_path
                 break
         return None
-    
-    def build_output_path(self, category: str, filename: str, config: Dict[str, Any], pdf_filepath: str) -> Optional[str]:
+
+    def build_output_path(self, category: str, filename: str, config: dict[str, Any], pdf_filepath: str) -> str | None:
         """Build the complete output file path."""
-        categories = config.get("categories", {})
-        
+        categories = config.get('categories', {})
+
         if category not in categories:
             return None
-            
-        relative_path = categories[category].get("output_path", "")
-        filepath = os.path.join(self.base_dir, relative_path, filename).replace("/", "\\")
-        
-        if not os.path.isfile(filepath):
+
+        relative_path = categories[category].get('output_path', '')
+        filepath = os.path.join(self.base_dir, relative_path, filename).replace('/', '\\')
+
+        if not Path(filepath).is_file():
             return filepath
-        
+
         # Check if files have same content
         try:
             if self._files_have_same_content(pdf_filepath, filepath):
                 return filepath
         except Exception:
             pass
-        
+
         # Handle filename conflicts
         return self._resolve_filename_conflict(filepath)
-    
+
     def _files_have_same_content(self, file1: str, file2: str) -> bool:
         """Check if two PDF files have the same content."""
         try:
             with pdfplumber.open(file1) as pdf1, pdfplumber.open(file2) as pdf2:
-                content1 = pdf1.pages[0].extract_text() if pdf1.pages else ""
-                content2 = pdf2.pages[0].extract_text() if pdf2.pages else ""
+                content1 = pdf1.pages[0].extract_text() if pdf1.pages else ''
+                content2 = pdf2.pages[0].extract_text() if pdf2.pages else ''
                 return content1 == content2
         except Exception:
             return False
-    
+
     def _resolve_filename_conflict(self, filepath: str) -> str:
         """Resolve filename conflicts by adding number suffix."""
         i = 1
         base, ext = os.path.splitext(filepath)
-        
-        while os.path.isfile(f"{base}({i}){ext}"):
+
+        while Path(f'{base}({i}){ext}').is_file():
             i += 1
-            
-        return f"{base}({i}){ext}"
-    
+
+        return f'{base}({i}){ext}'
+
     def move_file(self, source: str, destination: str) -> tuple[bool, bool]:
         """Move file from source to destination. Returns (success, is_new_file)."""
-        if not os.path.exists(source):
-            logger.warning(f"Source file does not exist: {source}")
+        if not Path(source).exists():
+            logger.warning('Source file does not exist: %s', source)
             return False, False
 
-        file_size = os.path.getsize(source)
+        file_size = Path(source).stat().st_size
 
         output_dir = os.path.dirname(destination)
-        
+
         if self.dry_run:
-            log_and_display(f"Would create directory: {output_dir}")
-            if os.path.exists(destination):
-                log_and_display(f"Would delete source file: {source}")
+            log_and_display(f'Would create directory: {output_dir}')
+            if Path(destination).exists():
+                log_and_display(f'Would delete source file: {source}')
                 return True, False
             else:
-                log_and_display(f"Would move {source} to {destination}")
+                log_and_display(f'Would move {source} to {destination}')
                 return True, True
-        
+
         # Create directory if needed
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        
+        if not Path(output_dir).exists():
+            Path(output_dir).mkdir(parents=True)
+
         # Handle existing destination
-        if os.path.exists(destination) and is_healthy(destination):
-            os.remove(source)
-            log_and_display(f"Destination exists. Deleted source file: {source}")
+        if Path(destination).exists() and is_healthy(destination):
+            Path(source).unlink()
+            log_and_display(f'Destination exists. Deleted source file: {source}')
             publish_file_deleted(source, file_size)
             return True, False
         else:
             shutil.move(source, destination)
             if not is_healthy(destination):
-                log_and_display(f"Moved file is corrupted: {destination}", level="error")
+                log_and_display(f'Moved file is corrupted: {destination}', level='error')
                 return False, False
-            
-            log_and_display(f"Moved {source} to {destination}.")
+
+            log_and_display(f'Moved {source} to {destination}.')
             publish_file_moved(source, destination, file_size, True)
             return True, True
-    
+
     def backup_file(self, source: str, backup_path: str) -> bool:
         """Create backup copy of file."""
-        if not backup_path or not os.path.exists(source):
+        if not backup_path or not Path(source).exists():
             return False
-            
+
         if self.dry_run:
-            log_and_display(f"Would backup {source} to {backup_path}")
+            log_and_display(f'Would backup {source} to {backup_path}')
             return True
-            
+
         try:
             backup_dir = os.path.dirname(backup_path)
-            if not os.path.exists(backup_dir):
-                os.makedirs(backup_dir)
-            
+            if not Path(backup_dir).exists():
+                Path(backup_dir).mkdir(parents=True)
+
             shutil.copy(source, backup_path)
-            log_and_display(f"Backed up {source} to {backup_path}.")
+            log_and_display(f'Backed up {source} to {backup_path}.')
             return True
         except Exception as e:
-            logger.error(f"Failed to backup {source}: {e}")
+            logger.error('Failed to backup %s: %s', source, e)
             return False
 
 
 class DoctopusPrime:
     """Single PDF processor with configurable classification and filing."""
-    
+
     def __init__(
         self,
         pdf_filepath: str,
-        base_dir: Optional[str] = None,
-        config_path: Optional[str] = None,
-        config: Optional[Dict] = None,
-        dry_run: bool = False
+        base_dir: str | None = None,
+        config_path: str | None = None,
+        config: dict | None = None,
+        dry_run: bool = False,
     ):
         """
         Initialize PDF processor.
-        
+
         Args:
             pdf_filepath: Path to PDF file to process
             base_dir: Override target base directory
@@ -340,141 +370,133 @@ class DoctopusPrime:
         # Determine base directory
         if base_dir:
             self.base_dir = base_dir
-        elif "target_dir" in self.config:
-            self.base_dir = self.config["target_dir"]
+        elif 'target_dir' in self.config:
+            self.base_dir = self.config['target_dir']
         else:
-            self.base_dir = str(Path.home() / "BryBoxPDFs")
-            
+            self.base_dir = str(Path.home() / 'BryBoxPDFs')
+
         # Initialize processors
         self.text_processor = _TextProcessor(self.config)
         self.metadata_extractor = _MetadataExtractor(self.config)
         self.special_handler = _SpecialCaseHandler()
         self.file_mover = _FileMover(self.base_dir, dry_run)
-    
+
     def process(self) -> _ProcessingContext:
         """
         Process the PDF file through the complete pipeline.
-        
+
         Returns:
             ProcessingContext with all extracted information
         """
-        context = _ProcessingContext(
-            pdf_filepath=self.pdf_filepath,
-            base_dir=self.base_dir
-        )
-        
+        context = _ProcessingContext(pdf_filepath=self.pdf_filepath, base_dir=self.base_dir)
+
         # Extract text
         context.content = self.text_processor.extract_content(self.pdf_filepath)
-        
+
         # Classify document
         context.category = self._classify_document(context.content)
-        
+
         # Filter to relevant lines
         context.condensed_lines = self.text_processor.reduce_to_relevant_lines(context.content)
-        
+
         # Handle special cases
         if context.category:
             context.condensed_lines = self.special_handler.handle_special_cases(
                 context.category, context.condensed_lines
             )
-        
+
         # Extract metadata
         context.document_date = self.metadata_extractor.extract_date(context.condensed_lines)
         context.invoice_id = self.metadata_extractor.extract_invoice_id(context.condensed_lines)
-        
-        filename_stem = self._get_filename_component(context.category or "")
+
+        filename_stem = self._get_filename_component(context.category or '')
 
         # Build output paths
-        context.output_filename = self._build_filename(
-            context.document_date, filename_stem, context.invoice_id
-        )
-        
+        context.output_filename = self._build_filename(context.document_date, filename_stem, context.invoice_id)
+
         if context.category:
             built_path = self.file_mover.build_output_path(
                 context.category, context.output_filename, self.config, self.pdf_filepath
             )
-            context.output_filepath = built_path or ""
+            context.output_filepath = built_path or ''
             context.backup_path = self.file_mover.get_backup_path(context.output_filepath)
-        
+
         return context
-    
-    def _classify_document(self, content: str) -> Optional[str]:
+
+    def _classify_document(self, content: str) -> str | None:
         """Classify document based on content triggers."""
-        categories = self.config.get("categories", {})
-        
+        categories = self.config.get('categories', {})
+
         for category, rules in categories.items():
-            triggers = rules.get("triggers", [])
+            triggers = rules.get('triggers', [])
             if all(trigger in content for trigger in triggers):
                 return category
-        
+
         return None
-    
+
     def _get_filename_component(self, category: str) -> str:
-      """Return the filename associated with the given category."""
-      categories = self.config.get("categories", {})
-      category_config = categories.get(category, {})
-      return category_config.get("filename", category)
-        
-    
-    def _build_filename(self, date: Optional[str], category: Optional[str], invoice_id: Optional[str]) -> str:
+        """Return the filename associated with the given category."""
+        categories = self.config.get('categories', {})
+        category_config = categories.get(category, {})
+        return category_config.get('filename', category)
+
+    def _build_filename(self, date: str | None, category: str | None, invoice_id: str | None) -> str:
         """Build output filename from components."""
         filename_parts = []
-        
+
         if date:
             filename_parts.append(date)
         if category:
             filename_parts.append(category)
         if invoice_id:
             filename_parts.append(invoice_id)
-            
-        filename = " ".join(filename_parts).strip()
-        return f"{filename}.pdf"
-    
+
+        filename = ' '.join(filename_parts).strip()
+        return f'{filename}.pdf'
+
     def shuttle_service(self, include_backup: bool = False) -> bool:
         """
         Move file to organized location.
-        
+
         Args:
             include_backup: Whether to create backup copy
-            
+
         Returns:
             True if file was successfully processed
         """
         context = self.process()
-        
+
         if not context.category or not context.output_filepath:
             return False
-            
+
         # Move main file
-        success, is_new = self.file_mover.move_file(
-            context.pdf_filepath, context.output_filepath
-        )
-        
+        success, is_new = self.file_mover.move_file(context.pdf_filepath, context.output_filepath)
+
         if not success:
             return False
-            
+
         context.is_new_file = is_new
-        
+
         # Create backup if requested
         if include_backup and context.backup_path and not self.dry_run:
             self.file_mover.backup_file(context.output_filepath, context.backup_path)
-        
+
         return True
-    
+
     @property
-    def category(self) -> Optional[str]:
+    def category(self) -> str | None:
         """Get document category."""
         context = self.process()
         return context.category
-    
+
     @property
-    def document_date(self) -> Optional[str]:
+    def document_date(self) -> str | None:
         """Get document date."""
         context = self.process()
         return context.document_date
-    
+
     @property
-    def invoice_id(self) -> Optional[str]:
+    def invoice_id(self) -> str | None:
         """Get invoice ID."""
         context = self.process()
         return context.invoice_id
@@ -482,20 +504,20 @@ class DoctopusPrime:
 
 class DoctopusPrimeNexus:
     """Batch PDF processor with shared configuration."""
-    
+
     def __init__(
         self,
         dir_path: str,
-        base_dir: Optional[str] = None,
-        config_path: Optional[str] = None,
-        config: Optional[Dict] = None,
+        base_dir: str | None = None,
+        config_path: str | None = None,
+        config: dict | None = None,
         dry_run: bool = False,
         # TODO: fix anti-pattern "MutableDefaultArg" for processor_class
-        processor_class: Type[DoctopusPrime] = DoctopusPrime
+        processor_class: type[DoctopusPrime] = DoctopusPrime,
     ):
         """
         Initialize batch processor.
-        
+
         Args:
             dir_path: Directory containing PDFs to process
             base_dir: Override target base directory
@@ -508,7 +530,7 @@ class DoctopusPrimeNexus:
         self.base_dir = base_dir
         self.dry_run = dry_run
         self.processor_class = processor_class
-        
+
         # Load config once for all files
         self.config = _load_doctopus_config(config_path, config)
 
@@ -516,7 +538,7 @@ class DoctopusPrimeNexus:
         self,
         include_backup: bool = False,
         progress_bar: bool = True,
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """
         Process all PDF files in directory.
 
@@ -527,30 +549,30 @@ class DoctopusPrimeNexus:
         Returns:
             Dict mapping file paths to success status
         """
-        pdf_files = glob.glob(os.path.join(self.dir_path, "*.pdf"))
+        pdf_files = glob.glob(os.path.join(self.dir_path, '*.pdf'))
         results = {}
 
-        log_and_display(f"Processing {len(pdf_files)} PDF file(s) in {self.dir_path}", sticky=True)
-        pdf_files = trackerator(pdf_files, description="Processing PDFs", final_message="All PDFs processed!") if progress_bar else pdf_files
+        log_and_display(f'Processing {len(pdf_files)} PDF file(s) in {self.dir_path}', sticky=True)
+        pdf_files = (
+            trackerator(pdf_files, description='Processing PDFs', final_message='All PDFs processed!')
+            if progress_bar
+            else pdf_files
+        )
 
         for pdf_file in pdf_files:
-            
             try:
                 processor = self.processor_class(
-                    pdf_filepath=pdf_file,
-                    base_dir=self.base_dir,
-                    config=self.config,
-                    dry_run=self.dry_run
+                    pdf_filepath=pdf_file, base_dir=self.base_dir, config=self.config, dry_run=self.dry_run
                 )
-                
+
                 success = processor.shuttle_service(include_backup=include_backup)
                 results[pdf_file] = success
-                
+
             except Exception as e:
                 if progress_bar:
-                    log_and_display(f"Error processing {pdf_file}: {e}")
+                    log_and_display(f'Error processing {pdf_file}: {e}')
                 else:
-                    log_and_display(f"Error processing {pdf_file}: {e}")
+                    log_and_display(f'Error processing {pdf_file}: {e}')
                 results[pdf_file] = False
 
         return results

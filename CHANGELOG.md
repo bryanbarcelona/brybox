@@ -1,7 +1,4 @@
-All notable changes to this project will be documented in this file.
-The format is based on [Keep a Changelog](https://keepachangelog.com/).
-
-## [Unreleased]
+## v0.5.0 (2025-12-15)
 
 ### Added
 - **New event type:** `FileAddedEvent`
@@ -31,8 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Failed or unhealthy downloads are not published.
 - The new event integrates seamlessly with existing `_handle_file_added()` logic to update expected filesystem state in downstream consumers.
 
-
-## [0.4.0] - 2025-11-95
+## v0.4.0 (2025-11-05)
 
 ### Changed
 - **Porter Architecture**: Refactored pixelporter into new `core/porter/` structure
@@ -123,7 +119,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - TODO: Dynamic path placeholders (e.g., `{artist}/{album}`)
 - Module structure supports easy addition of new audio formats and rules
 
-## [0.3.0] - 2025-10-11
+## v0.3.0 (2025-10-11)
 
 ### Added - VideoSith Module
 
@@ -257,8 +253,7 @@ processor = VideoSith(
 - Progress callbacks for long conversions
 - Health check validation after conversion
 
-
-## [0.2.0] - 2025-10-10
+## v0.2.0 (2025-10-10)
 
 ### Added
 - **SnapJedi**: Image-normalization submodule (newly extracted from monolithic legacy codebase)
@@ -357,8 +352,7 @@ processor = VideoSith(
   - Not yet registered in `_FILETYPE_CHECKERS` mimetype dispatcher
   - Will be addressed when HEIC validation is implemented in health checker utilities
 
-
-## [0.1.0] - 2025-10-01
+## v0.1.0 (2025-10-01)
 
 ### Added
 - `sticky` parameter in `log_and_display()` to display persistent terminal messages
