@@ -1,6 +1,6 @@
 [project]
 name = "brybox"
-version = "0.3.0"
+version = "0.4.0"
 description = "Brybox is a personal automation toolkit for PC organization. It streamlines repetitive tasks such as PDF sorting, photo and video organization, and email/download handling. Designed to replace tedious manual workflows, Brybox provides a flexible, extensible framework for managing digital clutter with ease."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -16,3 +16,82 @@ dependencies = [
     "rich>=14.1.0",
     "timezonefinder>=8.0.0",
 ]
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.10.1",
+    "pip-audit>=2.10.0",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "taskipy>=1.14.1",
+]
+
+
+[build-system]
+requires = ["uv_build>=0.8.17,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.taskipy.tasks]
+lint = "uvx ruff check . --fix"
+format = "uvx ruff format ."
+type = "uvx ty check ."
+test = "uv run pytest"
+# run audit, then wipe its cache folder
+audit   = "uv run pip-audit --skip-editable && rmdir /s /q \"%LOCALAPPDATA%\\pip-audit\" >nul 2>&1" # THIS IS IMPORTANT BECAUSE PIP-AUDIT THINKS IT'S TOTALLY FINE TO LEAVE JUNK BEHIND
+#audit   = "uvx pip-audit"
+#license = "uvx licensecheck --zero"
+
+
+[tool.ruff]
+preview = true
+line-length = 120
+target-version = "py312"
+
+lint.select = [
+  "E", "W", "F", "I", "UP", "B", "C4", "S", "BLE", "FBT",
+  "A", "C90", "T10", "ISC", "ICN", "G", "PIE", "T20",
+  "PT", "Q", "RUF", "SIM", "TID", "ARG", "PTH", "ERA",
+  "PL", "TRY", "ANN",  #  keep ANN, drop TCH/PYI
+]
+lint.ignore = [
+  "E501", "ISC001", "COM812", "S101",
+  "PLR0913", "PLR2004", "TRY003", "ANN401",
+  "Q000", "Q003", "T201", "RUF003"
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["imagetensors"]
+combine-as-imports = true
+force-wrap-aliases = true
+
+[tool.ruff.format]
+quote-style = "single"
+docstring-code-format = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN001", "ANN201", "PLC2701", "PT006", "PLR6301"]
+
+[tool.ty.rules]
+invalid-return-type = "error"
+
+[tool.pip-audit]
+exclude = ["imagetensors"]
+
+
+[tool.commitizen]
+version_provider = "uv"
+tag_format = "v${version}"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple/"
+publish-url = "https://upload.pypi.org/legacy/"
+explicit = true
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
+
