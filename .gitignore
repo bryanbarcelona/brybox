@@ -42,6 +42,7 @@ configs/*.json
 
 tester.py
 test_env_resetter.py
+test_env_resetter2.py
 src/brybox/core/doismith.py
 src/brybox/core/dropboss.py
 src/brybox/core/snap_jedi.py
