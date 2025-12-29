@@ -1,3 +1,13 @@
+## v0.5.0 (2025-12-29)
+
+### Feat
+
+- **events**: add FileAddedEvent and integrate publishing across all download sources
+
+### Fix
+
+- test CI/CD pipeline to PyPi
+
 ## v0.4.0 (2025-11-05)
 
 ### Changed
