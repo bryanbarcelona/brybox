@@ -6,8 +6,8 @@ import logging
 from logging import NullHandler
 
 # --- PACKAGE METADATA ---
-__version__ = "0.3.0"
-__author__ = "Bryan Barcelona"
+__version__ = '0.3.0'
+__author__ = 'Bryan Barcelona'
 
 # --- PACKAGE-LEVEL LOGGING CONFIGURATION ---
 VERBOSE_LOGGING = False
@@ -25,37 +25,30 @@ def enable_verbose_logging():
 
 # --- PUBLIC API IMPORTS ---
 # These imports also trigger logger configuration in their respective modules.
-from .utils.logging import log_and_display
-
-from .events.verifier import DirectoryVerifier
-
-from .core.doctopus import DoctopusPrime, DoctopusPrimeNexus
-
 from .core.audiora import AudioraCore, AudioraNexus
-
+from .core.doctopus import DoctopusPrime, DoctopusPrimeNexus
 from .core.inbox_kraken import fetch_and_process_emails
-
 from .core.porter import push_photos, push_videos
-
 from .core.snap_jedi import SnapJedi
-
 from .core.videosith import VideoSith
-
+from .events.verifier import DirectoryVerifier
+from .utils.logging import log_and_display
 
 # --- PREVENT "No handler found" WARNINGS ---
 logging.getLogger(__name__).addHandler(NullHandler())
 
 # --- PUBLIC INTERFACE ---
 __all__ = [
-    "enable_verbose_logging",
-    "log_and_display",
-    "DirectoryVerifier",
-    "DoctopusPrime",
-    "DoctopusPrimeNexus",
-    "fetch_and_process_emails",
-    "push_photos",
-    "SnapJedi",
-    "VideoSith",
-    "AudioraCore",
-    "AudioraNexus",
+    'AudioraCore',
+    'AudioraNexus',
+    'DirectoryVerifier',
+    'DoctopusPrime',
+    'DoctopusPrimeNexus',
+    'SnapJedi',
+    'VideoSith',
+    'enable_verbose_logging',
+    'fetch_and_process_emails',
+    'log_and_display',
+    'push_photos',
+    'push_videos',
 ]

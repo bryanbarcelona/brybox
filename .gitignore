@@ -10,6 +10,9 @@ dist/
 wheels/
 *.egg-info
 
+# IDE/editor config files
+.vscode/
+
 # Virtual environments
 .venv
 

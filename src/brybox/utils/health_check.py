@@ -1,11 +1,12 @@
-from pathlib import Path
-from typing import Callable
 import mimetypes
+from collections.abc import Callable
+from pathlib import Path
 
 import pdfplumber
 from PIL import Image
 
 # --- Specific file-type health checks ---
+
 
 def is_pdf_healthy(file_path: str | Path) -> bool:
     file_path = Path(file_path)
@@ -18,6 +19,7 @@ def is_pdf_healthy(file_path: str | Path) -> bool:
         return True
     except Exception:
         return False
+
 
 # TODO: Extend with more image check support (e.g. HEIC)
 def is_image_healthy(file_path: str | Path) -> bool:
@@ -36,10 +38,10 @@ def is_image_healthy(file_path: str | Path) -> bool:
 # --- Dispatcher / main API ---
 
 _FILETYPE_CHECKERS: dict[str, Callable[[Path], bool]] = {
-    "application/pdf": is_pdf_healthy,
-    "image/jpeg": is_image_healthy,
-    "image/png": is_image_healthy,
-    "image/gif": is_image_healthy,
+    'application/pdf': is_pdf_healthy,
+    'image/jpeg': is_image_healthy,
+    'image/png': is_image_healthy,
+    'image/gif': is_image_healthy,
 }
 
 
@@ -58,4 +60,4 @@ def is_healthy(file_path: str | Path) -> bool:
     return checker(file_path)
 
 
-__all__ = ["is_pdf_healthy", "is_image_healthy", "is_healthy"]
+__all__ = ['is_healthy', 'is_image_healthy', 'is_pdf_healthy']

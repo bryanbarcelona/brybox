@@ -1,23 +1,26 @@
 from __future__ import annotations
+
 import inspect
 import logging
+
 from rich.console import Console
 from rich.progress import (
-    Progress,
     BarColumn,
     MofNCompleteColumn,
-    TimeElapsedColumn,
+    Progress,
     TextColumn,
+    TimeElapsedColumn,
 )
 
-__all__ = ["log_manager", "get_configured_logger", "log_and_display", "trackerator"]
+__all__ = ['get_configured_logger', 'log_and_display', 'log_manager', 'trackerator']
+
 
 # --------------------------------------------------------------------------- #
 #  classic logger factory (unchanged)
 # --------------------------------------------------------------------------- #
 def get_configured_logger(name: str) -> logging.Logger:
     """Build or return an already-configured logger."""
-    from brybox import VERBOSE_LOGGING, _CONFIGURED_LOGGERS
+    from brybox import _CONFIGURED_LOGGERS, VERBOSE_LOGGING
 
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO if VERBOSE_LOGGING else logging.WARNING)
@@ -31,14 +34,16 @@ def get_configured_logger(name: str) -> logging.Logger:
 #  rich-backed console / progress singleton
 # --------------------------------------------------------------------------- #
 
+
 def _find_logger() -> logging.Logger | None:
     """First logger found outside this file."""
-    for frm in inspect.stack()[2:]:          # skip _find_logger + log
+    for frm in inspect.stack()[2:]:  # skip _find_logger + log
         if frm.filename == __file__:
             continue
-        if (lg := frm.frame.f_globals.get("logger")) is not None:
+        if (lg := frm.frame.f_globals.get('logger')) is not None:
             return lg
     return None
+
 
 class ConsoleLogger:
     """Thin façade: progress + optional sticky messages."""
@@ -50,10 +55,10 @@ class ConsoleLogger:
         # --- explicit wiring point ----------------------------------------- #
         self.logger: logging.Logger | None = None
         self._last_was_sticky: bool = False
-        self._last_loose_message_length: int = 0 
+        self._last_loose_message_length: int = 0
 
     #  progress lifecycle
-    def start_progress(self, total: int, description: str = "Working…") -> None:
+    def start_progress(self, total: int, description: str = 'Working…') -> None:
         if self._progress:
             self._progress.stop()
 
@@ -61,7 +66,7 @@ class ConsoleLogger:
             BarColumn(),
             MofNCompleteColumn(),
             TimeElapsedColumn(),
-            TextColumn("[progress.description]{task.description}"),  # mutable text
+            TextColumn('[progress.description]{task.description}'),  # mutable text
             console=self.console,
             transient=False,
         )
@@ -85,14 +90,13 @@ class ConsoleLogger:
         self._progress = self._task = None
 
     #  unified message API
-    def log(self, message: str, *, sticky: bool = False,
-            level: str = "info", log: bool = True) -> None:
+    def log(self, message: str, *, sticky: bool = False, level: str = 'info', log: bool = True) -> None:
 
         # 1. explicit logger takes precedence
         logger = self.logger
         # 2. otherwise walk the stack once
         if logger is None and log:
-            logger = _find_logger()          # no arguments, cached
+            logger = _find_logger()  # no arguments, cached
         # 3. log if we found one
         if logger is not None:
             getattr(logger, level.lower())(message)
@@ -105,7 +109,7 @@ class ConsoleLogger:
                 if self.console.is_terminal:
                     # Clear and replace the current line
                     clear_len = max(len(message), self._last_loose_message_length)
-                    self.console.file.write(f"\r{' ' * clear_len}\r{message}\n")
+                    self.console.file.write(f'\r{" " * clear_len}\r{message}\n')
                     self.console.file.flush()
                 else:
                     self.console.print(message)
@@ -122,7 +126,7 @@ class ConsoleLogger:
             # Non-sticky: update current line
             if self.console.is_terminal:
                 clear_len = max(len(message), self._last_loose_message_length)
-                self.console.file.write(f"\r{' ' * clear_len}\r{message}")
+                self.console.file.write(f'\r{" " * clear_len}\r{message}')
                 self.console.file.flush()
                 self._last_loose_message_length = len(message)
             else:
@@ -138,12 +142,12 @@ class ConsoleLogger:
 log_manager = ConsoleLogger()
 
 
-def log_and_display(message: str, sticky: bool = False, level: str = "info", log: bool = True) -> None:
+def log_and_display(message: str, sticky: bool = False, level: str = 'info', log: bool = True) -> None:
     """Log (if logger bound) + display (rich or plain)."""
     log_manager.log(message, sticky=sticky, level=level, log=log)
 
 
-def trackerator(items, description: str = "Working...", final_message: str | None = None):
+def trackerator(items, description: str = 'Working...', final_message: str | None = None):
     """Yield items while driving the progress bar."""
 
     total = len(items)
@@ -157,6 +161,5 @@ def trackerator(items, description: str = "Working...", final_message: str | Non
     log_manager.finalize_progress(final_message)
 
 
-if __name__ == "__main__":
-
+if __name__ == '__main__':
     pass

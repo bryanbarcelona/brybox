@@ -1,1 +1,1 @@
-from .snapjedi import SnapJedi
+from .snapjedi import SnapJedi as SnapJedi

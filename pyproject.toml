@@ -32,10 +32,15 @@ dev = [
 requires = ["uv_build>=0.8.17,<0.9.0"]
 build-backend = "uv_build"
 
+[tool.ty.src]
+include = ["src/", "tests/"]
+exclude = [".venv"]
+
+
 [tool.taskipy.tasks]
 lint = "uvx ruff check . --fix"
 format = "uvx ruff format ."
-type = "uvx ty check ."
+type = "uvx ty check src src/"
 test = "uv run pytest"
 # run audit, then wipe its cache folder
 audit   = "uv run pip-audit --skip-editable && rmdir /s /q \"%LOCALAPPDATA%\\pip-audit\" >nul 2>&1" # THIS IS IMPORTANT BECAUSE PIP-AUDIT THINKS IT'S TOTALLY FINE TO LEAVE JUNK BEHIND
@@ -57,7 +62,7 @@ lint.select = [
 lint.ignore = [
   "E501", "ISC001", "COM812", "S101",
   "PLR0913", "PLR2004", "TRY003", "ANN401",
-  "Q000", "Q003", "T201", "RUF003"
+  "Q000", "Q003", "T201", "RUF003", "FBT001"
 ]
 
 [tool.ruff.lint.isort]
@@ -71,6 +76,7 @@ docstring-code-format = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ANN001", "ANN201", "PLC2701", "PT006", "PLR6301"]
+
 
 [tool.ty.rules]
 invalid-return-type = "error"

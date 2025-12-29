@@ -1,6 +1,6 @@
 """PixelPorter - Photo ingestion and processing orchestrator."""
 
-from .orchestrator import push_photos, PushResult
-from .protocols import FileProcessor, Deduplicator, ProcessResult
+from .orchestrator import PushResult, push_photos
+from .protocols import Deduplicator, FileProcessor, ProcessResult
 
-__all__ = ['push_photos', 'PushResult', 'FileProcessor', 'Deduplicator', 'ProcessResult']
+__all__ = ['Deduplicator', 'FileProcessor', 'ProcessResult', 'PushResult', 'push_photos']
