@@ -1,33 +1,3 @@
-## v0.5.0 (2025-12-15)
-
-### Added
-- **New event type:** `FileAddedEvent`
-  - Represents the successful addition of a new file to the filesystem.
-  - Includes metadata: `file_path`, `file_size`, `is_healthy`, and `timestamp`.
-- **Convenience function:** `publish_file_added()`
-  - Simplifies emitting `FileAddedEvent` to the global event bus.
-  - Ensures consistent structure and timestamping across components.
-
-- **Event publishing integration across download sources:**
-  - `download_dropbox_audio()` now publishes a `FileAddedEvent` immediately after each Dropbox audio file is saved and verified.
-  - `download_attachment_handler()` now publishes a `FileAddedEvent` after each successfully saved PDF email attachment.
-  - `download_pdf_handler()` now publishes a `FileAddedEvent` after successful download of a PDF from an embedded link.
-  - `TechemScraper` now publishes a `FileAddedEvent` after successfully downloading and verifying a Techem PDF invoice.
-  - `KfwScraper` now publishes a `FileAddedEvent` after each successfully downloaded and healthy KfW PDF document.
-
-### Changed
-- Event payloads now carry:
-  - Full, resolved file path
-  - File size in bytes
-  - Health status of the downloaded file
-  - Timestamp for event traceability
-- Event publishing occurs **at the exact point of file creation** for strong consistency between disk state and event state.
-
-### Developer Notes
-- All publishing uses the `publish_file_added()` helper for consistency.
-- Failed or unhealthy downloads are not published.
-- The new event integrates seamlessly with existing `_handle_file_added()` logic to update expected filesystem state in downstream consumers.
-
 ## v0.4.0 (2025-11-05)
 
 ### Changed
