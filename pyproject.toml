@@ -24,7 +24,6 @@ dev = [
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
-    "taskipy>=1.14.1",
 ]
 
 
@@ -37,21 +36,12 @@ include = ["src/", "tests/"]
 exclude = [".venv"]
 
 
-[tool.taskipy.tasks]
-lint = "uvx ruff check . --fix"
-format = "uvx ruff format ."
-type = "uvx ty check src src/"
-test = "uv run pytest"
-# run audit, then wipe its cache folder
-audit   = "uv run pip-audit --skip-editable && rmdir /s /q \"%LOCALAPPDATA%\\pip-audit\" >nul 2>&1" # THIS IS IMPORTANT BECAUSE PIP-AUDIT THINKS IT'S TOTALLY FINE TO LEAVE JUNK BEHIND
-#audit   = "uvx pip-audit"
-#license = "uvx licensecheck --zero"
-
-
 [tool.ruff]
 preview = true
 line-length = 120
 target-version = "py312"
+extend-exclude = ["tests", "legacy", "main.py"]
+fix = true
 
 lint.select = [
   "E", "W", "F", "I", "UP", "B", "C4", "S", "BLE", "FBT",
@@ -66,7 +56,7 @@ lint.ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["imagetensors"]
+known-first-party = ["brybox"]
 combine-as-imports = true
 force-wrap-aliases = true
 
@@ -82,12 +72,14 @@ docstring-code-format = true
 invalid-return-type = "error"
 
 [tool.pip-audit]
-exclude = ["imagetensors"]
+exclude = ["brybox"]
 
 
 [tool.commitizen]
 version_provider = "uv"
 tag_format = "v${version}"
+major_version_zero = true
+bump_message = "release $current_version → $new_version [skip-ci]"
 
 [[tool.uv.index]]
 name = "pypi"
