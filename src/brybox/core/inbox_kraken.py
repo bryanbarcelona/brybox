@@ -20,25 +20,27 @@ from brybox.utils.credentials import CredentialsManager, EmailCredentials, WebCr
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
 from brybox.web_marionette.scrapers import KfwScraper, TechemScraper
 
+from brybox.utils.settings import BryboxSettings
+
 # --- config ------------------------------------------------------------------
 
 logger = get_configured_logger('InboxKraken')
 
 
-def _load_email_config(config_path: str | None = None, config: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Load merged email configs, matching PDF pattern."""
-    if config is not None:
-        return config
-    config_path = config_path or 'configs'
-    config_dir = Path(config_path)
-    if not config_dir.is_dir():
-        log_and_display(f'Config path {config_path} is not a directory - using defaults')
-        return {'paths': {}, 'rules': []}
-    loaded = ConfigLoader.load_configs(
-        config_path=str(config_dir), config_files={'paths': 'paths.json', 'rules': 'email_rules.json'}
-    )
-    log_and_display(f'Loaded configs from {config_path}')
-    return loaded
+# def _load_email_config(config_path: str | None = None, config: dict[str, Any] | None = None) -> dict[str, Any]:
+#     """Load merged email configs, matching PDF pattern."""
+#     if config is not None:
+#         return config
+#     config_path = config_path or 'configs'
+#     config_dir = Path(config_path)
+#     if not config_dir.is_dir():
+#         log_and_display(f'Config path {config_path} is not a directory - using defaults')
+#         return {'paths': {}, 'rules': []}
+#     loaded = ConfigLoader.load_configs(
+#         config_path=str(config_dir), config_files={'paths': 'paths.json', 'rules': 'email_rules.json'}
+#     )
+#     log_and_display(f'Loaded configs from {config_path}')
+#     return loaded
 
 
 # -----------------------------------------------------------------------------
@@ -271,7 +273,10 @@ def get_emails_to_process(
         # TODO: Remove debug skip
         # if uid != 43798 and uid != 43672:  # Debug skip
         #     continue
-        typ, data = mail.uid('FETCH', str(uid), '(RFC822)')
+        if uid != 43495:  # Debug only - skip these two emails
+            logger.info(f'Skipping UID {uid} for testing purposes')
+            continue
+        _, data = mail.uid('FETCH', str(uid), '(RFC822)')
         raw = data[0][1]
         emails.append((uid, raw))
 
@@ -556,16 +561,19 @@ def fetch_and_process_emails(
     dry_run: bool = False,
 ):
     # Default to loading from .env if not provided
-    if email_credentials is None:
-        credential_manager = CredentialsManager()
-        email_credentials = credential_manager.get_email_credentials()
+    # if email_credentials is None:
+    #     credential_manager = CredentialsManager()
+    #     email_credentials = credential_manager.get_email_credentials()
+    email_credentials = email_credentials or BryboxSettings().creds.get_email_credentials()
 
-    if web_credentials is None:
-        credential_manager = CredentialsManager()
-        web_credentials = credential_manager.get_web_credentials()
+    # if web_credentials is None:
+    #     credential_manager = CredentialsManager()
+    #     web_credentials = credential_manager.get_web_credentials()
+    web_credentials = web_credentials or BryboxSettings().creds.get_web_credentials()
 
     # Load configs
-    loaded_config = _load_email_config(config_path, config)
+    # loaded_config = _load_email_config(config_path, config)
+    loaded_config = config or BryboxSettings().email
     paths = loaded_config.get('paths', {})
     effective_save_dir = save_dir or paths.get('save_dir')
     if not effective_save_dir:

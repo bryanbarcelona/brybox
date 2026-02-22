@@ -191,9 +191,47 @@ def test_inbox_kraken():
     fetch_and_process_emails()
 
 
+def full_run_test():
+    configure_logging()
+    enable_verbose_logging()
+    log_and_display('Logging is configured.', sticky=True)
+
+    fetch_and_process_emails()
+
+    verifier = DirectoryVerifier(
+        r'C:\\Users\\Bryan\\Downloads\\TempInvoices20260222', r'C:\\Users\\Bryan\\Downloads\\sortedTempInvoices20260222'
+    )
+    # Example 2: Batch processing
+    batch_processor = DoctopusPrimeNexus(
+        dir_path=r'C:\\Users\\Bryan\\Downloads\\TempInvoices20260222',
+        base_dir=r'C:\Users\Bryan\Downloads\sortedTempInvoices20260222',
+        dry_run=False,
+    )
+
+    results = batch_processor.process_all(include_backup=False)
+    # print(f"Batch processing results: {results}")
+    success = verifier.report()
+    verifier.cleanup()
+
+    audio_source_dir = r'C:\Users\bryan\Downloads\TempInvoices20260222'
+    audio_target_dir = r'C:\Users\bryan\Downloads\Audioyeah'
+
+    verifier = DirectoryVerifier(audio_source_dir, audio_target_dir)
+    # Example 2: Batch processing
+    nexus_real = AudioraNexus(
+        dir_path=audio_source_dir, base_dir=audio_target_dir, dry_run=False
+    )
+    results_real = nexus_real.process_all(progress_bar=True)
+
+    success = verifier.report()
+    verifier.cleanup()
+
+    test_pixelporter()
+
 if __name__ == '__main__':
     # main()
     # test_pixelporter()
     # test_videosith()
     # test_audiora()
-    test_inbox_kraken()
+    # test_inbox_kraken()
+    full_run_test()

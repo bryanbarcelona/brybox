@@ -19,23 +19,24 @@ from brybox.events.bus import publish_file_deleted, publish_file_moved
 from brybox.utils.config_loader import ConfigLoader as _ConfigLoader
 from brybox.utils.health_check import is_healthy
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
+from brybox.utils.settings import BryboxSettings
 
 logger = get_configured_logger('DoctopusPrime')
 
 
-def _load_doctopus_config(config_path: str | None = None, config: dict | None = None) -> dict[str, Any]:
-    """Return merged doctopus JSON configs."""
-    if config is not None:
-        return config
-    config_path = config_path or 'configs'
-    return _ConfigLoader.load_configs(
-        config_path=config_path,
-        config_files={
-            'categories': 'doctopus_sorting_rules.json',
-            'extraction_rules': 'extraction_rules.json',
-            'metadata_triggers': 'metadata_triggers.json',
-        },
-    )
+# def _load_doctopus_config(config_path: str | None = None, config: dict | None = None) -> dict[str, Any]:
+#     """Return merged doctopus JSON configs."""
+#     if config is not None:
+#         return config
+#     config_path = config_path or 'configs'
+#     return _ConfigLoader.load_configs(
+#         config_path=config_path,
+#         config_files={
+#             'categories': 'doctopus_sorting_rules.json',
+#             'extraction_rules': 'extraction_rules.json',
+#             'metadata_triggers': 'metadata_triggers.json',
+#         },
+#     )
 
 
 @dataclass
@@ -365,7 +366,8 @@ class DoctopusPrime:
         self.dry_run = dry_run
 
         # Load configuration
-        self.config = _load_doctopus_config(config_path, config)
+        # self.config = _load_doctopus_config(config_path, config)
+        self.config = config or BryboxSettings().doctopus
 
         # Determine base directory
         if base_dir:
@@ -532,7 +534,8 @@ class DoctopusPrimeNexus:
         self.processor_class = processor_class
 
         # Load config once for all files
-        self.config = _load_doctopus_config(config_path, config)
+        # self.config = _load_doctopus_config(config_path, config)
+        self.config = config or BryboxSettings().doctopus
 
     def process_all(
         self,

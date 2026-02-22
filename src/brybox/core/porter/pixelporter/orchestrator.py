@@ -10,16 +10,18 @@ from .._shared.metadata_fixers import ExifTimestampFixer
 from .._shared.orchestration import run_porter_pipeline
 from .._shared.protocols import PorterResult
 
+from brybox.utils.settings import BryboxSettings
+
 logger = get_configured_logger('PixelPorter')
 
 
-def _load_pixelporter_config(config_path: str | None = None, config: dict | None = None) -> dict[str, Any]:
-    """Load PixelPorter configuration."""
-    if config is not None:
-        return config
+# def _load_pixelporter_config(config_path: str | None = None, config: dict | None = None) -> dict[str, Any]:
+#     """Load PixelPorter configuration."""
+#     if config is not None:
+#         return config
 
-    config_path = config_path or 'configs'
-    return ConfigLoader.load_configs(config_path=config_path, config_files={'paths': 'pixelporter_paths.json'})
+#     config_path = config_path or 'configs'
+#     return ConfigLoader.load_configs(config_path=config_path, config_files={'paths': 'pixelporter_paths.json'})
 
 
 def _get_default_processor():
@@ -85,7 +87,8 @@ def push_photos(
     """
     # Load config if paths not provided
     if source is None or target is None:
-        loaded_config = _load_pixelporter_config(config_path, config)
+        # loaded_config = _load_pixelporter_config(config_path, config)
+        loaded_config = config or BryboxSettings().pixelporter
         paths = loaded_config.get('paths', {})
         source = source or paths.get('source_folder')
         target = target or paths.get('target_folder')

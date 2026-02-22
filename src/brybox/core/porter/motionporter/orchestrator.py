@@ -3,22 +3,14 @@
 from pathlib import Path
 from typing import Any
 
-from ....utils.config_loader import ConfigLoader
+from brybox.utils.settings import BryboxSettings
+
 from ....utils.logging import get_configured_logger
 from .._shared.file_filters import VideoFileFilter
 from .._shared.orchestration import run_porter_pipeline
 from .._shared.protocols import PorterResult
 
 logger = get_configured_logger('MotionPorter')
-
-
-def _load_motionporter_config(config_path: str | None = None, config: dict | None = None) -> dict[str, Any]:
-    """Load MotionPorter configuration."""
-    if config is not None:
-        return config
-
-    config_path = config_path or 'configs'
-    return ConfigLoader.load_configs(config_path=config_path, config_files={'paths': 'pixelporter_paths.json'})
 
 
 def _get_default_processor():
@@ -64,7 +56,8 @@ def push_videos(
     """
     # Load config if paths not provided
     if source is None or target is None:
-        loaded_config = _load_motionporter_config(config_path, config)
+        # loaded_config = _load_motionporter_config(config_path, config)
+        loaded_config = config or BryboxSettings().motionporter
         paths = loaded_config.get('paths', {})
         source = source or paths.get('source_folder')
         target = target or paths.get('target_folder')
