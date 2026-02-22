@@ -151,7 +151,11 @@ class TechemScraper(BaseScraper):
 
     def _download_pdf(self, page, output_path: Path):
         """Download the PDF invoice."""
-        pdf_button = page.get_by_role('button', name='PDF herunterladen')
+        # Try multiple possible button names
+        pdf_button = page.get_by_role('button', name='PDF herunterladen').or_(
+            page.get_by_role('button', name='Download')
+        )
+
         pdf_button.wait_for(state='visible', timeout=15000)
 
         with page.expect_download() as download_info:
