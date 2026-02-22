@@ -1,3 +1,18 @@
+## v0.6.0 (2026-02-22)
+
+### BREAKING CHANGE
+
+- Submodule-specific config loader functions have been removed.
+Consumers should now use `BryboxSettings().<submodule>` for configuration access.
+
+### Fix
+
+- add resilience to PDF download button locator
+
+### Refactor
+
+- centralize configuration and credential management
+
 ## v0.5.0 (2025-12-29)
 
 ### Feat
