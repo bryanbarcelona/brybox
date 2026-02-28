@@ -15,13 +15,14 @@ from brybox.core.inbox_kraken.handlers import (
     manual_click_handler,
     techem_handler,
 )
+from brybox.core.models.email import ProcessingContext
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
 from brybox.utils.settings import BryboxSettings
 
 logger = get_configured_logger('InboxKraken')
 
 
-class KrakenEngine:
+class InboxKraken:
     """
     The Inbox Kraken: High-performance email orchestration.
     Uses a 'Hybrid Fetch' strategy to zip through junk while handling
@@ -145,14 +146,8 @@ class KrakenEngine:
         if not handler:
             return None
 
-        if tag in {Tag.TECHEM, Tag.KFW}:
-            return handler(meta, self.save_dir, self.creds)
-        if tag in {Tag.DOWNLOAD_ATTACH, Tag.DOWNLOAD_AUDIO}:
-            return handler(meta, self.save_dir, msg_obj)
-        if tag == Tag.DOWNLOAD_PDF:
-            return handler(meta, self.save_dir)
-        if tag in {Tag.MANUAL_CLICK, Tag.IGNORE, Tag.DELETE}:
-            return handler()
+        ctx = ProcessingContext(meta=meta, save_dir=self.save_dir, msg=msg_obj, creds=self.creds)
+        return handler(ctx)
 
     def __enter__(self):
         return self

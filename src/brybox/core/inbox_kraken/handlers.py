@@ -1,5 +1,4 @@
 import re
-from email.message import Message
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -7,15 +6,16 @@ import requests
 from bs4 import BeautifulSoup
 
 from brybox.core.inbox_kraken.helpers import classify_link, get_dropbox_download_link, resolve_redirected_url, save_path
-from brybox.core.models.email import EmailMeta, ProcessResult
+from brybox.core.models.email import ProcessingContext, ProcessResult
 from brybox.events.bus import publish_file_added
-from brybox.utils.credentials import WebCredentials
 from brybox.utils.logging import log_and_display
 from brybox.web_marionette.scrapers import KfwScraper, TechemScraper
 
 
-def download_pdf_handler(meta: EmailMeta, save_dir: Path) -> ProcessResult:
-    """Download PDF from an embedded link (e.g., Google Drive, direct CDN)."""
+def download_pdf_handler(ctx: ProcessingContext) -> ProcessResult:
+    meta = ctx.meta
+    save_dir = ctx.save_dir
+
     if not meta.invoice_link:
         return ProcessResult(
             success=False,
@@ -41,7 +41,7 @@ def download_pdf_handler(meta: EmailMeta, save_dir: Path) -> ProcessResult:
             error_message='',
             can_delete=True,
         )
-    except Exception as e:
+    except requests.RequestException as e:
         return ProcessResult(
             success=False,
             target_path=None,
@@ -50,8 +50,19 @@ def download_pdf_handler(meta: EmailMeta, save_dir: Path) -> ProcessResult:
         )
 
 
-def download_attachment_handler(meta: EmailMeta, save_dir: Path, msg: Message) -> ProcessResult:
-    """Extract all PDF attachments from the email message."""
+def download_attachment_handler(ctx: ProcessingContext) -> ProcessResult:
+    if ctx.msg is None:
+        return ProcessResult(
+            success=False,
+            target_path=None,
+            is_healthy=False,
+            error_message='No email message available for attachment extraction',
+        )
+
+    meta = ctx.meta
+    save_dir = ctx.save_dir
+    msg = ctx.msg
+
     last_saved_path = None
     any_success = False
 
@@ -78,8 +89,11 @@ def download_attachment_handler(meta: EmailMeta, save_dir: Path, msg: Message) -
     )
 
 
-def dropbox_audio_handler(meta: EmailMeta, save_dir: Path, msg: Message) -> ProcessResult:
-    """Handles confirmed Dropbox audio links by converting and streaming the download."""
+def dropbox_audio_handler(ctx: ProcessingContext) -> ProcessResult:
+
+    meta = ctx.meta
+    save_dir = ctx.save_dir
+
     soup = BeautifulSoup(meta.body_html, 'html.parser')
     links = [a['href'] for a in soup.find_all('a', href=True) if a['href'].startswith('http')]
 
@@ -120,10 +134,10 @@ def dropbox_audio_handler(meta: EmailMeta, save_dir: Path, msg: Message) -> Proc
                     for chunk in dl_r.iter_content(chunk_size=8192):
                         f.write(chunk)
 
-                publish_file_added(str(target_path), target_path.stat().st_size, True)
+                publish_file_added(str(target_path), target_path.stat().st_size, is_healthy=True)
                 downloaded_count += 1
 
-        except Exception as e:
+        except requests.RequestException as e:
             errors.append(f'Link {link} failed: {e!s}')
 
     success = downloaded_count > 0
@@ -138,11 +152,18 @@ def dropbox_audio_handler(meta: EmailMeta, save_dir: Path, msg: Message) -> Proc
     )
 
 
-def techem_handler(meta: EmailMeta, save_dir: Path, creds: WebCredentials) -> ProcessResult:
-    """Adapter for the Techem Playwright scraper."""
+def techem_handler(ctx: ProcessingContext) -> ProcessResult:
+    creds = ctx.creds
+    if creds is None or not creds.techem_user or not creds.techem_password:
+        return ProcessResult(
+            success=False,
+            target_path=None,
+            is_healthy=False,
+            error_message='Missing Techem credentials',
+        )
     try:
         scraper = TechemScraper(
-            username=creds.techem_user, password=creds.techem_password, download_dir=str(save_dir), headless=False
+            username=creds.techem_user, password=creds.techem_password, download_dir=str(ctx.save_dir), headless=False
         )
         result = scraper.download()
         is_ok = bool(result and not result.errors)
@@ -162,11 +183,19 @@ def techem_handler(meta: EmailMeta, save_dir: Path, creds: WebCredentials) -> Pr
         )
 
 
-def kfw_handler(meta: EmailMeta, save_dir: Path, creds: WebCredentials) -> ProcessResult:
-    """Adapter for the KfW Playwright scraper."""
+def kfw_handler(ctx: ProcessingContext) -> ProcessResult:
+    creds = ctx.creds
+    if creds is None or not creds.techem_user or not creds.techem_password:
+        return ProcessResult(
+            success=False,
+            target_path=None,
+            is_healthy=False,
+            error_message='Missing Techem credentials',
+        )
+
     try:
         scraper = KfwScraper(
-            username=creds.kfw_user, password=creds.kfw_password, download_dir=str(save_dir), headless=True
+            username=creds.kfw_user, password=creds.kfw_password, download_dir=str(ctx.save_dir), headless=True
         )
         result = scraper.download()
         success = bool(result and result.downloaded > 0)
@@ -186,7 +215,7 @@ def kfw_handler(meta: EmailMeta, save_dir: Path, creds: WebCredentials) -> Proce
         )
 
 
-def manual_click_handler() -> ProcessResult:
+def manual_click_handler(_ctx: ProcessingContext) -> ProcessResult:
     """Placeholder for emails requiring manual action — never deletes."""
     return ProcessResult(
         success=True,
@@ -197,7 +226,7 @@ def manual_click_handler() -> ProcessResult:
     )
 
 
-def ignore_handler() -> ProcessResult:
+def ignore_handler(_ctx: ProcessingContext) -> ProcessResult:
     """Signals to the engine to skip this email and leave it in the inbox."""
     return ProcessResult(
         success=True,
@@ -208,7 +237,7 @@ def ignore_handler() -> ProcessResult:
     )
 
 
-def delete_handler() -> ProcessResult:
+def delete_handler(_ctx: ProcessingContext) -> ProcessResult:
     """Signals to the engine that this email should be deleted."""
     return ProcessResult(
         success=True,

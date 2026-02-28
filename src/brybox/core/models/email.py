@@ -1,5 +1,22 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
 from pathlib import Path
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
+
+if TYPE_CHECKING:
+    from email.message import Message
+
+    from brybox.utils.credentials import WebCredentials
+
+
+@dataclass(frozen=True)
+class ProcessingContext:
+    meta: EmailMeta
+    save_dir: Path
+    msg: Message | None = None
+    creds: WebCredentials | None = None
+    # Future extensions
 
 
 class ProcessResult(NamedTuple):
