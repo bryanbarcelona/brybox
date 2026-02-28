@@ -1,0 +1,164 @@
+import imaplib
+import tempfile
+from pathlib import Path
+from typing import Any
+
+from brybox.core.inbox_kraken.classifier import EmailClassifier, Tag
+from brybox.core.inbox_kraken.fetcher import EmailFetcher
+from brybox.core.inbox_kraken.handlers import (
+    delete_handler,
+    download_attachment_handler,
+    download_pdf_handler,
+    dropbox_audio_handler,
+    ignore_handler,
+    kfw_handler,
+    manual_click_handler,
+    techem_handler,
+)
+from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
+from brybox.utils.settings import BryboxSettings
+
+logger = get_configured_logger('InboxKraken')
+
+
+class KrakenEngine:
+    """
+    The Inbox Kraken: High-performance email orchestration.
+    Uses a 'Hybrid Fetch' strategy to zip through junk while handling
+    heavy-duty attachments and scrapers on-demand.
+    """
+
+    def __init__(
+        self, mail_conn: imaplib.IMAP4_SSL | None = None, save_dir: Path | str | None = None, dry_run: bool = False
+    ):
+
+        # 1. Grab everything from centralized settings
+        settings = BryboxSettings()
+        e_creds = settings.creds.get_email_credentials()
+        self.rules = settings.email.get('rules', [])
+        self.creds = settings.creds.get_web_credentials()
+        self.dry_run = dry_run
+
+        # 2. Resolve Connection (Explicit vs Config vs Gmail Default)
+        if mail_conn:
+            self.mail = mail_conn
+        else:
+            host = e_creds.imap_server or 'imap.gmail.com'
+            self.mail = imaplib.IMAP4_SSL(host)
+            self.mail.login(e_creds.email, e_creds.password)
+            self.mail.select('INBOX')
+            log_and_display(f'Logged in to {host}')
+
+        # 3. Resolve Save Directory (Argument -> Config -> TempFallback)
+        config_path = settings.email.get('paths', {}).get('save_dir')
+        raw_path = save_dir or config_path
+
+        if not raw_path:
+            self.save_dir = Path(tempfile.mkdtemp(prefix='inbox_kraken_')).resolve()
+            log_and_display(f'Using temp save_dir: {self.save_dir}')
+        else:
+            self.save_dir = Path(raw_path).resolve()
+
+        self.save_dir.mkdir(exist_ok=True, parents=True)
+
+        # 4. Initialize Core Components
+        self.fetcher = EmailFetcher(self.mail)
+        self.classifier = EmailClassifier(self.rules)
+
+        # 5. Handler Registry
+        self.handlers = {
+            Tag.DOWNLOAD_PDF: download_pdf_handler,
+            Tag.DOWNLOAD_ATTACH: download_attachment_handler,
+            Tag.DOWNLOAD_AUDIO: dropbox_audio_handler,
+            Tag.TECHEM: techem_handler,
+            Tag.KFW: kfw_handler,
+            Tag.MANUAL_CLICK: manual_click_handler,
+            Tag.IGNORE: ignore_handler,
+            Tag.DELETE: delete_handler,
+        }
+
+    def run(self, mailbox: str = 'INBOX', limit: int | None = None, only_uids: list[int] | None = None):
+        """Standard entry point for processing the inbox."""
+        # This will only fetch the list of IDs (Fast)
+        uids = self.fetcher.fetch_uids(mailbox=mailbox, limit=limit, only_uids=only_uids)
+
+        if not uids:
+            log_and_display('No emails found to process.')
+            return
+
+        for uid in trackerator(uids, description='Kraken Processing'):
+            try:
+                self._process_single_email(uid)
+            except Exception as e:
+                log_and_display(f'Failed to process UID {uid}: {e}', level='ERROR')
+
+    def _process_single_email(self, uid: int):
+        # A. LIGHT FETCH
+        meta = self.fetcher.get_light_meta(uid)
+        if not meta:
+            return
+
+        # B. PRE-CHECK: Is this sender/subject even in our JSON?
+        if not self.classifier.is_candidate(meta):
+            log_and_display(f'[IGNORE] UID: {uid} | {meta.sender[:25]:<25} | Not in rules.')
+            return
+
+        meta, msg_obj = self.fetcher.get_full_message(uid)
+
+        # C. INITIAL CLASSIFY (Check for early actions like DELETE)
+        tag = self.classifier.classify(meta)
+
+        # LOG the found match
+        log_msg = f'[{tag.name}] UID: {uid} | {meta.sender[:25]:<25} | {meta.subject[:45]:<45}'
+        log_and_display(log_msg)
+
+        if tag == Tag.DELETE:
+            self._cleanup_email(uid)
+            return
+
+        if tag == Tag.IGNORE:
+            return
+
+        # E. EXECUTE HANDLER
+        result = self._execute_handler(tag, meta, msg_obj)
+        if result and result.success and result.can_delete:
+            self._cleanup_email(uid)
+
+    def _cleanup_email(self, uid: int):
+        if self.dry_run:
+            log_and_display(f'[DRY RUN] Would delete UID {uid}')
+            return
+
+        log_and_display(f'Deleting email UID {uid} in HARDCODED SIMULTATION MODE...')
+        # # Standard IMAP Move to Trash
+        # self.fetcher.mail.uid('MOVE', str(uid), '[Gmail]/Trash')
+        # self.fetcher.mail.expunge()
+
+        # try:
+        #     self.mail.uid('MOVE', str(uid), '[Gmail]/Trash')
+        #     self.mail.expunge()
+        # except Exception as e:
+        #     log_and_display(f"Failed to delete UID {uid}: {e}", level="ERROR")
+
+    def _execute_handler(self, tag: Tag, meta: Any, msg_obj: Any | None):
+        handler = self.handlers.get(tag)
+        if not handler:
+            return None
+
+        if tag in {Tag.TECHEM, Tag.KFW}:
+            return handler(meta, self.save_dir, self.creds)
+        if tag in {Tag.DOWNLOAD_ATTACH, Tag.DOWNLOAD_AUDIO}:
+            return handler(meta, self.save_dir, msg_obj)
+        if tag == Tag.DOWNLOAD_PDF:
+            return handler(meta, self.save_dir)
+        if tag in {Tag.MANUAL_CLICK, Tag.IGNORE, Tag.DELETE}:
+            return handler()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            self.mail.logout()
+        except:
+            pass

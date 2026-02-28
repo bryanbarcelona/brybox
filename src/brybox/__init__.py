@@ -5,10 +5,6 @@ Brybox - A collection of automation and document processing tools.
 import logging
 from logging import NullHandler
 
-# --- PACKAGE METADATA ---
-__version__ = '0.3.0'
-__author__ = 'Bryan Barcelona'
-
 # --- PACKAGE-LEVEL LOGGING CONFIGURATION ---
 VERBOSE_LOGGING = False
 _CONFIGURED_LOGGERS = []
@@ -25,14 +21,14 @@ def enable_verbose_logging():
 
 # --- PUBLIC API IMPORTS ---
 # These imports also trigger logger configuration in their respective modules.
-from .core.audiora import AudioraCore, AudioraNexus
-from .core.doctopus import DoctopusPrime, DoctopusPrimeNexus
-from .core.inbox_kraken import fetch_and_process_emails
-from .core.porter import push_photos, push_videos
-from .core.snap_jedi import SnapJedi
-from .core.videosith import VideoSith
-from .events.verifier import DirectoryVerifier
-from .utils.logging import log_and_display
+from brybox.core.audiora import AudioraCore, AudioraNexus
+from brybox.core.doctopus import DoctopusPrime, DoctopusPrimeNexus
+from brybox.core.inbox_kraken.engine import KrakenEngine
+from brybox.core.porter import push_photos, push_videos
+from brybox.core.snap_jedi import SnapJedi
+from brybox.core.videosith import VideoSith
+from brybox.events.verifier import DirectoryVerifier
+from brybox.utils.logging import log_and_display
 
 # --- PREVENT "No handler found" WARNINGS ---
 logging.getLogger(__name__).addHandler(NullHandler())
@@ -44,10 +40,10 @@ __all__ = [
     'DirectoryVerifier',
     'DoctopusPrime',
     'DoctopusPrimeNexus',
+    'KrakenEngine',
     'SnapJedi',
     'VideoSith',
     'enable_verbose_logging',
-    'fetch_and_process_emails',
     'log_and_display',
     'push_photos',
     'push_videos',
