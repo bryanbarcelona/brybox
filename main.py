@@ -7,10 +7,11 @@ from brybox import (
     DoctopusPrimeNexus,
     VideoSith,
     enable_verbose_logging,
-    fetch_and_process_emails,
+    #fetch_and_process_emails,
     log_and_display,
     push_photos,
     push_videos,
+    InboxKraken
 )
 from logging_config import configure_logging
 
@@ -46,7 +47,7 @@ def main():
     success = verifier.report()
     verifier.cleanup()
 
-    fetch_and_process_emails()
+    #fetch_and_process_emails()
 
     log_and_display('Finished all tasks.', sticky=True)
     # print("BEFORE DoctopusPrime: root handlers =", len(logging.getLogger().handlers))
@@ -188,23 +189,46 @@ def test_inbox_kraken():
     configure_logging()
     enable_verbose_logging()
 
-    fetch_and_process_emails()
+    #fetch_and_process_emails()
 
 
 def full_run_test():
+
+    SAMPLE_EMAIL_UIDS = [
+        40323, # delete - Lina Hildebrandt
+        43512, # audio - Chuck
+        43503, # PDF link - Bolt
+        43495, # Techem
+        43560, # KfW
+        43482, # Stoklossa
+    ]
     configure_logging()
     enable_verbose_logging()
     log_and_display('Logging is configured.', sticky=True)
 
-    fetch_and_process_emails()
+    log_and_display("🚀 Starting Kraken Smoke Test...")
+
+    #fetch_and_process_emails()
+
+    with InboxKraken(dry_run=False) as kraken:
+            
+        # Scenario A: Test against specific UIDs you know have attachments or links
+        # targeted_uids = [12345, 12346]
+        # kraken.run(only_uids=targeted_uids)
+
+        # Scenario B: Just run against the last 10 emails in the inbox
+        #log_and_display("Running against the last 10 emails...")
+        kraken.run()
+
+        log_and_display("✅ Smoke test complete. Check the logs above for [DRY RUN] messages.")    
 
     verifier = DirectoryVerifier(
-        r'C:\\Users\\Bryan\\Downloads\\TempInvoices20260222', r'C:\\Users\\Bryan\\Downloads\\sortedTempInvoices20260222'
+        r'C:\\Users\\Bryan\\Downloads\\TempInvoices20260224', r'C:\\Users\\Bryan\\Downloads\\sortedTempInvoices20260224'
     )
     # Example 2: Batch processing
     batch_processor = DoctopusPrimeNexus(
-        dir_path=r'C:\\Users\\Bryan\\Downloads\\TempInvoices20260222',
-        base_dir=r'C:\Users\Bryan\Downloads\sortedTempInvoices20260222',
+        dir_path=r'C:\\Users\\Bryan\\Downloads\\TempInvoices20260224',
+        base_dir=r'C:\Users\Bryan\Downloads\sortedTempInvoices20260224',
         dry_run=False,
     )
 
@@ -213,8 +237,8 @@ def full_run_test():
     success = verifier.report()
     verifier.cleanup()
 
-    audio_source_dir = r'C:\Users\bryan\Downloads\TempInvoices20260222'
-    audio_target_dir = r'C:\Users\bryan\Downloads\Audioyeah'
+    audio_source_dir = r'C:\Users\bryan\Downloads\TempInvoices20260224'
+    audio_target_dir = r'C:\Users\bryan\Downloads\Audio20260224'
 
     verifier = DirectoryVerifier(audio_source_dir, audio_target_dir)
     # Example 2: Batch processing
@@ -226,7 +250,7 @@ def full_run_test():
     success = verifier.report()
     verifier.cleanup()
 
-    test_pixelporter()
+    #test_pixelporter()
 
 if __name__ == '__main__':
     # main()

@@ -34,6 +34,7 @@ RESERVED_NAMES = {
 
 # --- 1. RESOLUTION HELPERS ---
 
+
 def resolve_redirected_url(url: str) -> str:
     """
     Unmasks tracking URLs (mlsend, bitly, etc.) to find the real destination.
@@ -43,14 +44,15 @@ def resolve_redirected_url(url: str) -> str:
         # HEAD is often ignored by trackers; GET with stream=True is the reliable way.
         with requests.get(url, allow_redirects=True, timeout=10, stream=True) as r:
             return r.url
-    except Exception:
+    except requests.RequestException:
         return url
+
 
 def get_dropbox_download_link(url: str) -> str:
     """Converts a Dropbox share link (viewing page) to a direct download stream."""
     if 'dropbox.com' not in url.lower():
         return url
-    
+
     # Force the dl=1 parameter
     direct_url = url.replace('dl=0', 'dl=1')
     if '?dl=1' not in direct_url:
@@ -59,6 +61,7 @@ def get_dropbox_download_link(url: str) -> str:
 
 
 # --- 2. CLASSIFICATION HELPERS ---
+
 
 def classify_link(url: str) -> str:
     """
@@ -72,7 +75,7 @@ def classify_link(url: str) -> str:
 
         # Step 2: Quick check for direct extensions in URL
         audio_exts = {'.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'}
-        
+
         # Step 3: Peek at headers via a stream request
         with requests.get(resolved_url, allow_redirects=True, timeout=10, stream=True) as r:
             ctype = r.headers.get('Content-Type', '').lower()
@@ -80,17 +83,20 @@ def classify_link(url: str) -> str:
 
             if 'pdf' in ctype or resolved_lower.endswith('.pdf'):
                 return 'PDF'
-            
-            if 'dropbox.com' in resolved_lower:
-                if any(ext in resolved_lower for ext in audio_exts) or any(ext in disp for ext in audio_exts):
-                    return 'AUDIO'
 
-        return 'HTML page'
-    except Exception:
+            if 'dropbox.com' in resolved_lower and (
+                any(ext in resolved_lower for ext in audio_exts) or any(ext in disp for ext in audio_exts)
+            ):
+                return 'AUDIO'
+
+    except requests.RequestException:
         return 'Error'
+    else:
+        return 'HTML page'
 
 
 # --- 3. HTML PARSING HELPERS ---
+
 
 def extract_invoice_link(html: str) -> str | None:
     """Finds potential invoice/receipt links in the HTML body."""
@@ -104,79 +110,6 @@ def extract_invoice_link(html: str) -> str | None:
         if any(k in text or k in href for k in ('invoice', 'receipt', 'rechnung', 'beleg')):
             return a['href']
     return None
-
-# # --- HTML & LINK HELPERS ---
-
-
-# def extract_invoice_link(html: str) -> str | None:
-#     """Exact logic from original parse_email_content."""
-#     if not html:
-#         return None
-#     soup = BeautifulSoup(html, 'html.parser')
-#     for a in soup.find_all('a', href=True):
-#         text = a.get_text(strip=True).lower()
-#         href = a['href'].lower()
-#         if any(k in text or k in href for k in ('invoice', 'receipt', 'rechnung')):
-#             return a['href']
-#     return None
-
-
-# # def classify_link(url: str) -> str:
-# #     """Exact logic from original classify_link."""
-# #     try:
-# #         r = requests.head(url, allow_redirects=True, timeout=10)
-# #         ctype = r.headers.get('Content-Type', '').lower()
-# #         return 'PDF' if 'pdf' in ctype else 'HTML page'
-# #     except Exception:
-# #         return 'Error'
-# def classify_link(url: str) -> str:
-#     """Peeks at the link to see if it's a candidate for the Audio or PDF handlers."""
-#     try:
-#         # We must follow redirects (allow_redirects=True) to unmask the tracking URL
-#         r = requests.head(url, allow_redirects=True, timeout=10)
-#         final_url = r.url.lower()
-#         print(f'Classifying link: {url} -> Final URL after redirects: {final_url}')
-#         # 1. Check Content-Type (Good for direct PDFs)
-#         ctype = r.headers.get('Content-Type', '').lower()
-#         if 'pdf' in ctype:
-#             return 'PDF'
-
-#         # 2. Check for Dropbox + Audio Extensions (The original logic)
-#         audio_extensions = {'.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'}
-#         if 'dropbox.com' in final_url:
-#             # Check if the path contains an audio extension
-#             if any(ext in final_url for ext in audio_extensions):
-#                 return 'AUDIO'
-
-#         return 'HTML page'
-#     except Exception:
-#         return 'Error'
-
-
-# def get_dropbox_download_link(url: str) -> str:
-#     """
-#     Extracted logic from original download_dropbox_audio.
-#     Converts a Dropbox share link to a direct download link.
-#     """
-#     if 'dropbox.com' not in url.lower():
-#         return url
-
-#     # Replace dl=0 with dl=1 or append it
-#     download_url = url.replace('dl=0', 'dl=1')
-#     if '?dl=1' not in download_url:
-#         download_url += '&dl=1' if '?' in download_url else '?dl=1'
-#     return download_url
-
-
-# def resolve_redirected_url(url: str) -> str:
-#     """Follows redirects to find the real destination URL."""
-#     try:
-#         # We use allow_redirects=True and a HEAD request to be fast
-#         response = requests.head(url, allow_redirects=True, timeout=5)
-#         return response.url
-#     except Exception:
-#         # If it fails, return the original URL so the process can at least try
-#         return url
 
 
 # --- STRING & FILESYSTEM HELPERS ---
@@ -211,10 +144,12 @@ def decode_mime_words(s: str) -> str:
         if isinstance(content, bytes):
             charset = encoding or 'utf-8'
             try:
-                content = content.decode(charset, errors='replace')
+                decoded = content.decode(charset, errors='replace')
             except LookupError:
-                content = content.decode('utf-8', errors='replace')
-        fragments.append(content)
+                decoded = content.decode('utf-8', errors='replace')
+            fragments.append(decoded)
+        else:
+            fragments.append(content)
 
     full_string = ''.join(fragments)
     # Replaces non-breaking space \u00A0 and other whitespace

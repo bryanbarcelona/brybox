@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from brybox.core.inbox_kraken.helpers import classify_link, get_dropbox_download_link, resolve_redirected_url, save_path
 from brybox.core.models.email import ProcessingContext, ProcessResult
 from brybox.events.bus import publish_file_added
+from brybox.exceptions import ScraperError
 from brybox.utils.logging import log_and_display
 from brybox.web_marionette.scrapers import KfwScraper, TechemScraper
 
@@ -174,12 +175,12 @@ def techem_handler(ctx: ProcessingContext) -> ProcessResult:
             error_message='',
             can_delete=is_ok,
         )
-    except Exception as e:
+    except ScraperError as e:
         return ProcessResult(
             success=False,
             target_path=None,
             is_healthy=False,
-            error_message=str(e),
+            error_message=f'Techem Scraper failed: {e!s}',
         )
 
 
@@ -206,12 +207,12 @@ def kfw_handler(ctx: ProcessingContext) -> ProcessResult:
             error_message='',
             can_delete=success,
         )
-    except Exception as e:
+    except ScraperError as e:
         return ProcessResult(
             success=False,
             target_path=None,
             is_healthy=False,
-            error_message=str(e),
+            error_message=f'KfW Scraper failed: {e!s}',
         )
 
 

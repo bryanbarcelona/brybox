@@ -32,6 +32,9 @@ class EmailFetcher:
         """FAST: Fetches only headers for classification, DELETE, and Scraper triggers."""
         try:
             typ, data = self.mail.uid('FETCH', str(uid), '(BODY.PEEK[HEADER])')
+        except (imaplib.IMAP4.error, OSError):
+            return None
+        else:
             if typ != 'OK' or not data:
                 return None
 
@@ -44,13 +47,14 @@ class EmailFetcher:
                 attachments=[],
                 invoice_link=None,
             )
-        except Exception:
-            return None
 
     def get_full_message(self, uid: int) -> tuple[EmailMeta | None, Message | None]:
         """SLOW: Fetches full content for PDF/Attachment extraction."""
         try:
             typ, data = self.mail.uid('FETCH', str(uid), '(RFC822)')
+        except (imaplib.IMAP4.error, OSError):
+            return None, None
+        else:
             if typ != 'OK' or not data or data[0] is None:
                 return None, None
 
@@ -75,5 +79,3 @@ class EmailFetcher:
                 invoice_link=link,
             )
             return meta, msg
-        except Exception:
-            return None, None

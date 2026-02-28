@@ -43,7 +43,8 @@ class CredentialsManager:
         else:
             load_dotenv()  # Load from default .env file
 
-    def get_email_credentials(self) -> EmailCredentials:
+    @staticmethod
+    def get_email_credentials() -> EmailCredentials:
         """Load email credentials from environment."""
         email = os.getenv('EMAIL')
         password = os.getenv('APP_PWD')
@@ -52,7 +53,8 @@ class CredentialsManager:
 
         return EmailCredentials(email=email, password=password, imap_server=imap_server, imap_port=imap_port)
 
-    def get_web_credentials(self) -> WebCredentials:
+    @staticmethod
+    def get_web_credentials() -> WebCredentials:
         """Load web automation credentials from environment."""
         return WebCredentials(
             techem_user=os.getenv('USER_MAIN'),

@@ -1,6 +1,7 @@
 from pathlib import Path
-from platformdirs import user_config_dir
 from typing import Any
+
+from platformdirs import user_config_dir
 
 from brybox.utils.config_loader import ConfigLoader
 from brybox.utils.credentials import CredentialsManager
@@ -12,7 +13,7 @@ class BryboxSettings:
     def __new__(cls, *args, **kwargs):
         """Standard Python Singleton: ensures only one instance ever exists."""
         if cls._instance is None:
-            cls._instance = super(BryboxSettings, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 

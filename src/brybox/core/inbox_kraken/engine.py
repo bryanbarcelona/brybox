@@ -1,7 +1,8 @@
 import imaplib
 import tempfile
+from contextlib import suppress
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from brybox.core.inbox_kraken.classifier import EmailClassifier, Tag
 from brybox.core.inbox_kraken.fetcher import EmailFetcher
@@ -19,6 +20,12 @@ from brybox.core.models.email import ProcessingContext
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
 from brybox.utils.settings import BryboxSettings
 
+if TYPE_CHECKING:
+    from types import TracebackType
+
+    from brybox.core.models.email import ProcessResult
+
+
 logger = get_configured_logger('InboxKraken')
 
 
@@ -30,7 +37,7 @@ class InboxKraken:
     """
 
     def __init__(
-        self, mail_conn: imaplib.IMAP4_SSL | None = None, save_dir: Path | str | None = None, dry_run: bool = False
+        self, mail_conn: imaplib.IMAP4_SSL | None = None, save_dir: Path | str | None = None, *, dry_run: bool = True
     ):
 
         # 1. Grab everything from centralized settings
@@ -78,7 +85,7 @@ class InboxKraken:
             Tag.DELETE: delete_handler,
         }
 
-    def run(self, mailbox: str = 'INBOX', limit: int | None = None, only_uids: list[int] | None = None):
+    def run(self, mailbox: str = 'INBOX', limit: int | None = None, only_uids: list[int] | None = None) -> None:
         """Standard entry point for processing the inbox."""
         # This will only fetch the list of IDs (Fast)
         uids = self.fetcher.fetch_uids(mailbox=mailbox, limit=limit, only_uids=only_uids)
@@ -90,10 +97,10 @@ class InboxKraken:
         for uid in trackerator(uids, description='Kraken Processing'):
             try:
                 self._process_single_email(uid)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 log_and_display(f'Failed to process UID {uid}: {e}', level='ERROR')
 
-    def _process_single_email(self, uid: int):
+    def _process_single_email(self, uid: int) -> None:
         # A. LIGHT FETCH
         meta = self.fetcher.get_light_meta(uid)
         if not meta:
@@ -125,23 +132,18 @@ class InboxKraken:
         if result and result.success and result.can_delete:
             self._cleanup_email(uid)
 
-    def _cleanup_email(self, uid: int):
+    def _cleanup_email(self, uid: int) -> None:
         if self.dry_run:
             log_and_display(f'[DRY RUN] Would delete UID {uid}')
             return
 
-        log_and_display(f'Deleting email UID {uid} in HARDCODED SIMULTATION MODE...')
-        # # Standard IMAP Move to Trash
-        # self.fetcher.mail.uid('MOVE', str(uid), '[Gmail]/Trash')
-        # self.fetcher.mail.expunge()
+        # Standard IMAP Move to Trash
+        self.mail.uid('MOVE', str(uid), '[Gmail]/Trash')
+        self.mail.expunge()
 
-        # try:
-        #     self.mail.uid('MOVE', str(uid), '[Gmail]/Trash')
-        #     self.mail.expunge()
-        # except Exception as e:
-        #     log_and_display(f"Failed to delete UID {uid}: {e}", level="ERROR")
+        log_and_display(f'Moved UID {uid} to Trash.')
 
-    def _execute_handler(self, tag: Tag, meta: Any, msg_obj: Any | None):
+    def _execute_handler(self, tag: Tag, meta: Any, msg_obj: Any | None) -> ProcessResult | None:
         handler = self.handlers.get(tag)
         if not handler:
             return None
@@ -149,11 +151,11 @@ class InboxKraken:
         ctx = ProcessingContext(meta=meta, save_dir=self.save_dir, msg=msg_obj, creds=self.creds)
         return handler(ctx)
 
-    def __enter__(self):
+    def __enter__(self) -> 'InboxKraken':
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        try:
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: 'TracebackType | None'
+    ) -> None:
+        with suppress(Exception):
             self.mail.logout()
-        except:
-            pass

@@ -2,6 +2,8 @@
 Brybox - A collection of automation and document processing tools.
 """
 
+# --- PUBLIC API IMPORTS ---
+# These imports also trigger logger configuration in their respective modules.
 import logging
 from logging import NullHandler
 
@@ -10,7 +12,7 @@ VERBOSE_LOGGING = False
 _CONFIGURED_LOGGERS = []
 
 
-def enable_verbose_logging():
+def enable_verbose_logging() -> None:
     """Enable INFO-level logging for all Brybox modules."""
     global VERBOSE_LOGGING
     VERBOSE_LOGGING = True
@@ -19,11 +21,9 @@ def enable_verbose_logging():
         logger.setLevel(logging.INFO)
 
 
-# --- PUBLIC API IMPORTS ---
-# These imports also trigger logger configuration in their respective modules.
 from brybox.core.audiora import AudioraCore, AudioraNexus
 from brybox.core.doctopus import DoctopusPrime, DoctopusPrimeNexus
-from brybox.core.inbox_kraken.engine import KrakenEngine
+from brybox.core.inbox_kraken.engine import InboxKraken
 from brybox.core.porter import push_photos, push_videos
 from brybox.core.snap_jedi import SnapJedi
 from brybox.core.videosith import VideoSith
@@ -40,7 +40,7 @@ __all__ = [
     'DirectoryVerifier',
     'DoctopusPrime',
     'DoctopusPrimeNexus',
-    'KrakenEngine',
+    'InboxKraken',
     'SnapJedi',
     'VideoSith',
     'enable_verbose_logging',
