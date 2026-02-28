@@ -39,7 +39,8 @@ jobs:
           git_email: "bryan.barcelona@gmail.com"
           push: false
           changelog: true
-
+          no_raise: 21
+          
       - name: Build distribution packages
         if: steps.cz.outputs.version != ''
         run: uv build
