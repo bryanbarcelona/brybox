@@ -110,8 +110,6 @@ def dropbox_audio_handler(ctx: ProcessingContext) -> ProcessResult:
             resolved_url = resolve_redirected_url(link)
             direct_url = get_dropbox_download_link(resolved_url)
 
-            log_and_display(f'Downloading Dropbox Audio: {direct_url}')
-
             with requests.get(direct_url, stream=True, timeout=30) as dl_r:
                 dl_r.raise_for_status()
 
@@ -129,6 +127,8 @@ def dropbox_audio_handler(ctx: ProcessingContext) -> ProcessResult:
                 if target_path.exists():
                     downloaded_count += 1
                     continue
+
+                log_and_display(f'Downloading Dropbox Audio: {filename}')
 
                 # Binary stream write
                 with target_path.open('wb') as f:
