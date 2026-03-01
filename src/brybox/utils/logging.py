@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import inspect
 import logging
+from collections.abc import Iterator
+from logging import NullHandler
+from typing import TypeVar
 
 from rich.console import Console
 from rich.progress import (
@@ -12,27 +15,45 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
+T = TypeVar('T')
+
 __all__ = ['get_configured_logger', 'log_and_display', 'log_manager', 'trackerator']
 
+_CONFIGURED_LOGGERS: list[str] = []
+VERBOSE_LOGGING: bool = False
 
-# --------------------------------------------------------------------------- #
-#  classic logger factory (unchanged)
-# --------------------------------------------------------------------------- #
+
 def get_configured_logger(name: str) -> logging.Logger:
     """Build or return an already-configured logger."""
-    from brybox import _CONFIGURED_LOGGERS, VERBOSE_LOGGING
-
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO if VERBOSE_LOGGING else logging.WARNING)
 
+    # Register if new
     if name not in _CONFIGURED_LOGGERS:
         _CONFIGURED_LOGGERS.append(name)
+
+    # Apply current verbosity (this runs every time → safe for late enable)
+    if VERBOSE_LOGGING:
+        logger.setLevel(logging.INFO)
+    else:
+        logger.setLevel(logging.WARNING)
+
+    # ensure no "no handler" spam
+    if not logger.handlers:
+        logger.addHandler(NullHandler())
+
     return logger
 
 
-# --------------------------------------------------------------------------- #
-#  rich-backed console / progress singleton
-# --------------------------------------------------------------------------- #
+def enable_verbose_logging() -> None:
+    """Enable INFO level for all Brybox loggers that have been created so far.
+
+    Call this early (right after `import brybox`) if you want early log messages.
+    Calling it later still upgrades existing loggers.
+    """
+    global VERBOSE_LOGGING
+    VERBOSE_LOGGING = True
+    for name in _CONFIGURED_LOGGERS:
+        logging.getLogger(name).setLevel(logging.INFO)
 
 
 def _find_logger() -> logging.Logger | None:
@@ -136,18 +157,15 @@ class ConsoleLogger:
             self._last_was_sticky = False
 
 
-# --------------------------------------------------------------------------- #
-#  public façade
-# --------------------------------------------------------------------------- #
 log_manager = ConsoleLogger()
 
 
-def log_and_display(message: str, sticky: bool = False, level: str = 'info', log: bool = True) -> None:
+def log_and_display(message: str, level: str = 'info', *, sticky: bool = False, log: bool = True) -> None:
     """Log (if logger bound) + display (rich or plain)."""
     log_manager.log(message, sticky=sticky, level=level, log=log)
 
 
-def trackerator(items, description: str = 'Working...', final_message: str | None = None):
+def trackerator(items: list, description: str = 'Working...', final_message: str | None = None) -> Iterator[T]:
     """Yield items while driving the progress bar."""
 
     total = len(items)

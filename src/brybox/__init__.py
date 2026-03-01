@@ -2,25 +2,10 @@
 Brybox - A collection of automation and document processing tools.
 """
 
-# --- PUBLIC API IMPORTS ---
-# These imports also trigger logger configuration in their respective modules.
 import logging
 from logging import NullHandler
 
-# --- PACKAGE-LEVEL LOGGING CONFIGURATION ---
-VERBOSE_LOGGING = False
-_CONFIGURED_LOGGERS = []
-
-
-def enable_verbose_logging() -> None:
-    """Enable INFO-level logging for all Brybox modules."""
-    global VERBOSE_LOGGING
-    VERBOSE_LOGGING = True
-    for name in _CONFIGURED_LOGGERS:
-        logger = logging.getLogger(name)
-        logger.setLevel(logging.INFO)
-
-
+# Public API re-exports
 from brybox.core.audiora import AudioraCore, AudioraNexus
 from brybox.core.doctopus import DoctopusPrime, DoctopusPrimeNexus
 from brybox.core.inbox_kraken.engine import InboxKraken
@@ -28,10 +13,18 @@ from brybox.core.porter import push_photos, push_videos
 from brybox.core.snap_jedi import SnapJedi
 from brybox.core.videosith import VideoSith
 from brybox.events.verifier import DirectoryVerifier
-from brybox.utils.logging import log_and_display
 
-# --- PREVENT "No handler found" WARNINGS ---
+# Logging helpers (now safe — no circular dependency)
+from brybox.utils.logging import (
+    enable_verbose_logging,  # ← re-export the function
+    log_and_display,
+    log_manager,
+    trackerator,
+)
+
+# Prevent "No handler found" warnings for the package logger itself
 logging.getLogger(__name__).addHandler(NullHandler())
+
 
 # --- PUBLIC INTERFACE ---
 __all__ = [
@@ -45,6 +38,8 @@ __all__ = [
     'VideoSith',
     'enable_verbose_logging',
     'log_and_display',
+    'log_manager',
     'push_photos',
     'push_videos',
+    'trackerator',
 ]
