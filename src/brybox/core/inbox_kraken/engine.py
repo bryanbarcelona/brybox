@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import imaplib
 import tempfile
 from contextlib import suppress
@@ -151,11 +153,11 @@ class InboxKraken:
         ctx = ProcessingContext(meta=meta, save_dir=self.save_dir, msg=msg_obj, creds=self.creds)
         return handler(ctx)
 
-    def __enter__(self) -> 'InboxKraken':
+    def __enter__(self) -> InboxKraken:
         return self
 
     def __exit__(
-        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: 'TracebackType | None'
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
     ) -> None:
         with suppress(Exception):
             self.mail.logout()
