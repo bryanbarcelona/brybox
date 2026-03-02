@@ -46,23 +46,38 @@ class HashDeduplicator:
 
         return dict(hash_groups)
 
-    def _hash_file(self, path: Path) -> str:
+    @staticmethod
+    def is_duplicate(file_a: Path, file_b: Path) -> bool:
+        """
+        Return True if both files have identical content.
+
+        Args:
+            file_a: First file to compare.
+            file_b: Second file to compare.
+        """
+        try:
+            return HashDeduplicator._hash_file(file_a) == HashDeduplicator._hash_file(file_b)
+        except OSError:
+            return False
+
+    @staticmethod
+    def _hash_file(path: Path, chunk_size: int = 8192) -> str:
         """
         Compute SHA-256 hash of file content.
 
-        Reads file in chunks to handle large files efficiently without
-        loading entire file into memory.
+        Reads in chunks to handle large files without loading into memory.
 
         Args:
-            path: File to hash
+            path: File to hash.
+            chunk_size: Bytes to read at a time.
 
         Returns:
-            Hex string of SHA-256 hash
+            Hex string of SHA-256 hash.
         """
         sha256 = hashlib.sha256()
 
         with Path(path).open('rb') as f:
-            for chunk in iter(lambda: f.read(self.chunk_size), b''):
+            for chunk in iter(lambda: f.read(chunk_size), b''):
                 sha256.update(chunk)
 
         return sha256.hexdigest()

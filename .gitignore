@@ -47,3 +47,4 @@ src/brybox/core/doismith.py
 src/brybox/core/dropboss.py
 src/brybox/core/snap_jedi.py
 src/brybox/core/video_sith.py
+main.py
