@@ -14,6 +14,7 @@ from brybox import (
     InboxKraken
 )
 from logging_config import configure_logging
+from test_env_resetter import testing_doctopus
 
 logger = logging.getLogger('BryBox')
 
@@ -191,16 +192,35 @@ def test_inbox_kraken():
 
     #fetch_and_process_emails()
 
+def test_doctopus():
+    # Clean up testing environment
+    testing_doctopus()
+
+    verifier = DirectoryVerifier(
+        r"D:\BryBoxTesting\DoctopusTest\src", r"D:\BryBoxTesting\DoctopusTest\dst"
+    )
+    # Example 2: Batch processing
+    batch_processor = DoctopusPrimeNexus(
+        dir_path=r"D:\BryBoxTesting\DoctopusTest\src",
+        base_dir=r"D:\BryBoxTesting\DoctopusTest\dst",
+        dry_run=False,
+    )
+
+    results = batch_processor.process_all()
+    # print(f"Batch processing results: {results}")
+    success = verifier.report()
+    verifier.cleanup()
+
 
 def full_run_test():
 
     SAMPLE_EMAIL_UIDS = [
-        40323, # delete - Lina Hildebrandt
+        43661, # delete - Lina Hildebrandt
         43512, # audio - Chuck
-        43503, # PDF link - Bolt
-        43495, # Techem
+        43674, # PDF link - Bolt
+        43672, # Techem
         43560, # KfW
-        43482, # Stoklossa
+        43829, # Stoklossa
     ]
     configure_logging()
     enable_verbose_logging()
@@ -210,7 +230,7 @@ def full_run_test():
 
     #fetch_and_process_emails()
 
-    with InboxKraken(dry_run=False) as kraken:
+    with InboxKraken(dry_run=True) as kraken:
             
         # Scenario A: Test against specific UIDs you know have attachments or links
         # targeted_uids = [12345, 12346]
@@ -218,7 +238,7 @@ def full_run_test():
 
         # Scenario B: Just run against the last 10 emails in the inbox
         #log_and_display("Running against the last 10 emails...")
-        kraken.run()
+        kraken.run(only_uids=SAMPLE_EMAIL_UIDS)
 
         log_and_display("✅ Smoke test complete. Check the logs above for [DRY RUN] messages.")    
 
@@ -258,4 +278,5 @@ if __name__ == '__main__':
     # test_videosith()
     # test_audiora()
     # test_inbox_kraken()
-    full_run_test()
+    # full_run_test()
+    test_doctopus()
