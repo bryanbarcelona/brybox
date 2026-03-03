@@ -35,6 +35,7 @@ class DoctopusPrime:
         pdf_filepath: str | Path,
         base_dir: str | Path | None = None,
         config: dict | None = None,
+        *,
         dry_run: bool = False,
         components: DoctopusComponents | None = None,
     ):
@@ -128,19 +129,18 @@ class DoctopusPrime:
             DoctopusConfigurationError: If configuration is invalid
             DoctopusFileOperationError: If file system operations fail
         """
-        try:
-            context = self.process()
-        except DoctopusError:
-            # Already logged in process(), just re-raise
-            raise
+        context = self.process()
 
         if not context.category or not context.output_filepath:
             return False
 
         try:
             success, is_new = self.file_mover.move_file(context.pdf_filepath, context.output_filepath)
+        except DoctopusFileOperationError as e:
+            log_and_display(f'💾 File operation failed for {self.pdf_filepath.name}: {e}', level='error')
+            raise
+        else:
             context.is_new_file = is_new
-
             if is_new:
                 log_and_display(f'✅ Moved: {self.pdf_filepath.name} → {context.category}', level='info')
             else:
@@ -148,13 +148,8 @@ class DoctopusPrime:
                     f'🔄 Duplicate deleted: {self.pdf_filepath.name} (already exists in {context.category})',
                     level='info',
                 )
-
             self._last_context = context
             return success
-
-        except DoctopusFileOperationError as e:
-            log_and_display(f'💾 File operation failed for {self.pdf_filepath.name}: {e}', level='error')
-            raise
 
     def _classify_document(self, content: str) -> str | None:
         """Return the first category whose triggers all appear in content, or None."""
@@ -186,6 +181,7 @@ class DoctopusPrimeNexus:
         dir_path: str | Path,
         base_dir: str | Path | None = None,
         config: dict | None = None,
+        *,
         dry_run: bool = False,
         processor_class: type[DoctopusPrime] = DoctopusPrime,
     ):
@@ -203,7 +199,7 @@ class DoctopusPrimeNexus:
         self.processor_class = processor_class
         self.config = config or BryboxSettings().doctopus
 
-    def process_all(self, progress_bar: bool = True) -> dict[str, dict]:
+    def process_all(self, *, progress_bar: bool = True) -> dict[str, dict]:
         """
         Process all PDF files in the configured directory.
 

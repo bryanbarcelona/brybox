@@ -22,7 +22,8 @@ class TextProcessor:
     def __init__(self, config: dict[str, Any]):
         self.config = config
 
-    def extract_content(self, pdf_path: Path) -> str:
+    @staticmethod
+    def extract_content(pdf_path: Path) -> str:
         """Extract text content from the first page of a PDF."""
         if not pdf_path.exists():
             raise DoctopusPDFNotFoundError(f'PDF file not found: {pdf_path}', pdf_path=pdf_path)
@@ -44,76 +45,96 @@ class TextProcessor:
 
     def reduce_to_relevant_lines(self, content: str) -> list[str]:
         """
-        Filter content to lines likely to contain dates or invoice metadata,
-        based on extraction rules defined in config.
+        Filter content to lines likely to contain dates or invoice metadata.
         """
-        extraction_rules = self.config.get('extraction_rules', {})
-
-        months = [
-            'January',
-            'Januar',
-            'February',
-            'Februar',
-            'March',
-            'März',
-            'April',
-            'May',
-            'Mai',
-            'June',
-            'Juni',
-            'July',
-            'Juli',
-            'August',
-            'September',
-            'October',
-            'Oktober',
-            'November',
-            'December',
-            'Dezember',
-        ]
-
-        month_translations = {
-            'January': 'Januar',
-            'February': 'Februar',
-            'March': 'März',
-            'May': 'Mai',
-            'June': 'Juni',
-            'July': 'Juli',
-            'October': 'Oktober',
-            'Oct': 'Okt',
-            'December': 'Dezember',
-            'Dec': 'Dez',
-        }
-
         lines = content.split('\n')
+        normalized_lines = self._normalize_months(lines)
 
-        # Normalise German month names to English so downstream parsing is consistent
-        for i, line in enumerate(lines):
-            for english, german in month_translations.items():
-                if english not in line:
-                    lines[i] = lines[i].replace(german, english)
-
+        extraction_rules = self.config.get('extraction_rules', {})
         relevant_lines = []
-        for i, line in enumerate(lines):
-            if any(substring in line for substring in month_translations.keys() | month_translations.values()):
+
+        for i, line in enumerate(normalized_lines):
+            if self._contains_month(line):
                 relevant_lines.append(line)
+                continue
 
-            for trigger_type, triggers in extraction_rules.items():
-                for trigger in triggers:
-                    if trigger in line:
-                        if trigger_type == 'same_line':
-                            line = f'{trigger}{line.split(trigger)[-1]}'
-                            relevant_lines.append(line.replace(trigger, '').replace(':', '').strip())
-                            relevant_lines.append(line)
-                        elif trigger_type == 'previous_line' and i > 0:
-                            relevant_lines.append(lines[i - 1])
-                        elif trigger_type == 'next_line' and i < len(lines) - 1:
-                            relevant_lines.append(lines[i + 1])
+            rule_matches = self._get_rule_matches(line, i, normalized_lines, extraction_rules)
+            relevant_lines.extend(rule_matches)
 
-            if any(month.lower() in line.lower() for month in months):
-                relevant_lines.append(line)
+        return relevant_lines if relevant_lines else normalized_lines
 
-        return relevant_lines if relevant_lines else lines
+    def _get_rule_matches(self, line: str, index: int, all_lines: list[str], rules: dict) -> list[str]:
+        """Helper to process all triggers for a single line to keep nesting low."""
+        matches = []
+        for trigger_type, triggers in rules.items():
+            for trigger in triggers:
+                if trigger not in line:
+                    continue
+
+                result = self._apply_trigger_logic(trigger_type, trigger, line, index, all_lines)
+                if isinstance(result, list):
+                    matches.extend(result)
+                elif result:
+                    matches.append(result)
+        return matches
+
+    @staticmethod
+    def _normalize_months(lines: list[str]) -> list[str]:
+        """Helper to translate German months to English."""
+        month_translations = {
+            'Januar': 'January',
+            'Februar': 'February',
+            'März': 'March',
+            'Mai': 'May',
+            'Juni': 'June',
+            'Juli': 'July',
+            'Oktober': 'October',
+            'Okt': 'Oct',
+            'Dezember': 'December',
+            'Dez': 'Dez',
+        }
+        new_lines = []
+        for line in lines:
+            updated_line = line
+            for german, english in month_translations.items():
+                updated_line = updated_line.replace(german, english)
+            new_lines.append(updated_line)
+        return new_lines
+
+    @staticmethod
+    def _contains_month(line: str) -> bool:
+        """Helper to check if a line contains any month name."""
+        months = [
+            'january',
+            'february',
+            'march',
+            'april',
+            'may',
+            'june',
+            'july',
+            'august',
+            'september',
+            'october',
+            'november',
+            'december',
+        ]
+        line_lower = line.lower()
+        return any(m in line_lower for m in months)
+
+    @staticmethod
+    def _apply_trigger_logic(trigger_type: str, trigger: str, line: str, index: int, all_lines: list[str]) -> Any:
+        """Handles the specific 'trigger_type' logic for line filtering."""
+        if trigger_type == 'same_line':
+            segment = f'{trigger}{line.rsplit(trigger, maxsplit=1)[-1]}'
+            return [segment.replace(trigger, '').replace(':', '').strip(), segment]
+
+        if trigger_type == 'previous_line' and index > 0:
+            return all_lines[index - 1]
+
+        if trigger_type == 'next_line' and index < len(all_lines) - 1:
+            return all_lines[index + 1]
+
+        return None
 
 
 class MetadataExtractor:
@@ -144,7 +165,8 @@ class MetadataExtractor:
 
         return None
 
-    def _parse_date(self, line: str) -> Any:
+    @staticmethod
+    def _parse_date(line: str) -> Any:
         """Parse a date string into a datetime object, inferring delimiter convention."""
         line = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', line)
 
@@ -184,7 +206,8 @@ class SpecialCaseHandler:
 
         return lines
 
-    def _handle_mcdonalds(self, lines: list[str]) -> list[str]:
+    @staticmethod
+    def _handle_mcdonalds(lines: list[str]) -> list[str]:
         """
         Normalise McDonald's date format.
 

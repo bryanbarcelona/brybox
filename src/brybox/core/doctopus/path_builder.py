@@ -25,12 +25,14 @@ class PathBuilder:
     def __init__(self, base_dir: Path):
         self.base_dir = base_dir
 
-    def build_filename(self, date: str | None, category: str | None, invoice_id: str | None) -> str:
+    @staticmethod
+    def build_filename(date: str | None, category: str | None, invoice_id: str | None) -> str:
         """Assemble output filename from available metadata components."""
         parts = [p for p in (date, category, invoice_id) if p]
         return f'{" ".join(parts).strip()}.pdf'
 
-    def get_filename_component(self, category: str, config: dict[str, Any]) -> str:
+    @staticmethod
+    def get_filename_component(category: str, config: dict[str, Any]) -> str:
         """Return the filename label configured for the given category, falling back to the category name."""
         category_config = config.get('categories', {}).get(category, {})
         return category_config.get('filename', category)
@@ -62,19 +64,20 @@ class PathBuilder:
 
         # Check if it's a duplicate
         try:
-            if HashDeduplicator().is_duplicate(pdf_filepath, filepath):
-                return filepath
+            is_duplicate = HashDeduplicator().is_duplicate(pdf_filepath, filepath)
         except Exception as e:
             raise DoctopusFileOperationError(
                 f'Failed to check for duplicate between {pdf_filepath} and {filepath}: {e}',
                 source_path=pdf_filepath,
                 dest_path=filepath,
             ) from e
+        else:
+            if is_duplicate:
+                return filepath
 
         # Resolve conflict
         try:
-            resolved = resolve_filename_conflict(filepath)
-            return resolved
+            return resolve_filename_conflict(filepath)
         except Exception as e:
             raise DoctopusFileOperationError(
                 f'Failed to resolve filename conflict for {filepath}: {e}', source_path=pdf_filepath, dest_path=filepath

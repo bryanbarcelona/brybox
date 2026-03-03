@@ -21,7 +21,7 @@ class FileMover:
     See PathBuilder for output path assembly.
     """
 
-    def __init__(self, dry_run: bool = False):
+    def __init__(self, *, dry_run: bool = False):
         self.dry_run = dry_run
 
     def move_file(self, source: Path, destination: Path) -> tuple[bool, bool]:
@@ -39,40 +39,64 @@ class FileMover:
         output_dir = destination.parent
 
         if self.dry_run:
-            log_and_display(f'Would create directory: {output_dir}')
-            if destination.exists():
-                log_and_display(f'Would delete source file (duplicate): {source}')
-                return True, False
-            else:
-                log_and_display(f'Would move {source} to {destination}')
-                return True, True
+            return self._handle_dry_run(source, destination, output_dir)
 
+        self._ensure_directory_exists(output_dir, source, destination)
+
+        # Handle duplicates (source is deleted if destination already exists and is healthy)
+        if destination.exists() and is_healthy(destination):
+            self._remove_duplicate_source(source, destination, file_size)
+            return True, False
+
+        # Execute move
+        self._execute_move(source, destination)
+
+        # Post-move validation and event
+        if not is_healthy(destination):
+            raise DoctopusFileOperationError(
+                f'Moved file appears corrupted: {destination}', source_path=source, dest_path=destination
+            )
+
+        publish_file_moved(source, destination, file_size, is_new=True)
+        return True, True
+
+    @staticmethod
+    def _handle_dry_run(source: Path, destination: Path, output_dir: Path) -> tuple[bool, bool]:
+        """Helper to reduce move_file complexity."""
+        log_and_display(f'Would create directory: {output_dir}')
+        if destination.exists():
+            log_and_display(f'Would delete source file (duplicate): {source}')
+            return True, False
+
+        log_and_display(f'Would move {source} to {destination}')
+        return True, True
+
+    @staticmethod
+    def _ensure_directory_exists(output_dir: Path, source: Path, destination: Path) -> None:
+        """Helper to reduce move_file branching/complexity."""
         if not output_dir.exists():
             try:
                 output_dir.mkdir(parents=True)
-            except PermissionError as e:
-                raise DoctopusFileOperationError(
-                    f'Permission denied creating directory: {output_dir}', source_path=source, dest_path=destination
-                ) from e
-            except OSError as e:
+            except (PermissionError, OSError) as e:
                 raise DoctopusFileOperationError(
                     f'Failed to create directory {output_dir}: {e}', source_path=source, dest_path=destination
                 ) from e
 
-        if destination.exists() and is_healthy(destination):
-            try:
-                source.unlink()
-                publish_file_deleted(source, file_size)
-                return True, False
-            except PermissionError as e:
-                raise DoctopusFileOperationError(
-                    f'Permission denied deleting source file: {source}', source_path=source, dest_path=destination
-                ) from e
-            except OSError as e:
-                raise DoctopusFileOperationError(
-                    f'Failed to delete source file {source}: {e}', source_path=source, dest_path=destination
-                ) from e
+    @staticmethod
+    def _remove_duplicate_source(source: Path, destination: Path, file_size: int) -> None:
+        """Helper to handle source deletion when a healthy duplicate exists."""
+        try:
+            source.unlink()
+        except (PermissionError, OSError) as e:
+            raise DoctopusFileOperationError(
+                f'Failed to delete source file {source}: {e}', source_path=source, dest_path=destination
+            ) from e
+        else:
+            publish_file_deleted(source, file_size)
 
+    @staticmethod
+    def _execute_move(source: Path, destination: Path) -> None:
+        """Helper to execute the actual move with error handling."""
         try:
             shutil.move(source, destination)
         except PermissionError as e:
@@ -80,16 +104,7 @@ class FileMover:
                 f'Permission denied moving {source} to {destination}', source_path=source, dest_path=destination
             ) from e
         except OSError as e:
-            disk_full = 'No space left' in str(e)
-            msg = 'Disk full' if disk_full else 'Failed to move'
+            msg = 'Disk full' if 'No space left' in str(e) else 'Failed to move'
             raise DoctopusFileOperationError(
                 f'{msg}: {source} to {destination} - {e}', source_path=source, dest_path=destination
             ) from e
-
-        if not is_healthy(destination):
-            raise DoctopusFileOperationError(
-                f'Moved file appears corrupted: {destination}', source_path=source, dest_path=destination
-            )
-
-        publish_file_moved(source, destination, file_size, True)
-        return True, True

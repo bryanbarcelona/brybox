@@ -194,6 +194,13 @@ def test_inbox_kraken():
 
 def test_doctopus():
     # Clean up testing environment
+
+    configure_logging()
+    enable_verbose_logging()
+    log_and_display('Logging is configured.', sticky=True)
+
+    log_and_display("🚀 Starting Doctopus Smoke Test...")
+
     testing_doctopus()
 
     verifier = DirectoryVerifier(
