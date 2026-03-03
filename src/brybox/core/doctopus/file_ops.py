@@ -6,10 +6,11 @@ import shutil
 from pathlib import Path
 
 from brybox.events.bus import publish_file_deleted, publish_file_moved
+from brybox.exceptions.documents import DoctopusFileOperationError, DoctopusPDFNotFoundError
 from brybox.utils.health_check import is_healthy
 from brybox.utils.logging import get_configured_logger, log_and_display
 
-logger = get_configured_logger('Doctopus')
+logger = get_configured_logger('File Ops')
 
 
 class FileMover:
@@ -32,8 +33,7 @@ class FileMover:
             already existed and the source was deleted as a duplicate.
         """
         if not source.exists():
-            logger.warning('Source file does not exist: %s', source)
-            return False, False
+            raise DoctopusPDFNotFoundError(f'Source file does not exist: {source}', pdf_path=source)
 
         file_size = source.stat().st_size
         output_dir = destination.parent
@@ -48,20 +48,48 @@ class FileMover:
                 return True, True
 
         if not output_dir.exists():
-            output_dir.mkdir(parents=True)
+            try:
+                output_dir.mkdir(parents=True)
+            except PermissionError as e:
+                raise DoctopusFileOperationError(
+                    f'Permission denied creating directory: {output_dir}', source_path=source, dest_path=destination
+                ) from e
+            except OSError as e:
+                raise DoctopusFileOperationError(
+                    f'Failed to create directory {output_dir}: {e}', source_path=source, dest_path=destination
+                ) from e
 
         if destination.exists() and is_healthy(destination):
-            source.unlink()
-            log_and_display(f'Destination exists. Deleted source file: {source}')
-            publish_file_deleted(source, file_size)
-            return True, False
+            try:
+                source.unlink()
+                publish_file_deleted(source, file_size)
+                return True, False
+            except PermissionError as e:
+                raise DoctopusFileOperationError(
+                    f'Permission denied deleting source file: {source}', source_path=source, dest_path=destination
+                ) from e
+            except OSError as e:
+                raise DoctopusFileOperationError(
+                    f'Failed to delete source file {source}: {e}', source_path=source, dest_path=destination
+                ) from e
 
-        shutil.move(source, destination)
+        try:
+            shutil.move(source, destination)
+        except PermissionError as e:
+            raise DoctopusFileOperationError(
+                f'Permission denied moving {source} to {destination}', source_path=source, dest_path=destination
+            ) from e
+        except OSError as e:
+            disk_full = 'No space left' in str(e)
+            msg = 'Disk full' if disk_full else 'Failed to move'
+            raise DoctopusFileOperationError(
+                f'{msg}: {source} to {destination} - {e}', source_path=source, dest_path=destination
+            ) from e
 
         if not is_healthy(destination):
-            log_and_display(f'Moved file is corrupted: {destination}', level='error')
-            return False, False
+            raise DoctopusFileOperationError(
+                f'Moved file appears corrupted: {destination}', source_path=source, dest_path=destination
+            )
 
-        log_and_display(f'Moved {source} to {destination}.')
         publish_file_moved(source, destination, file_size, True)
         return True, True

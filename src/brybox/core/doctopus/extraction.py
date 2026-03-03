@@ -10,6 +10,11 @@ from typing import Any
 import pdfplumber
 from dateutil import parser
 
+from brybox.exceptions.documents import DoctopusPDFError, DoctopusPDFNotFoundError
+from brybox.utils.logging import get_configured_logger
+
+logger = get_configured_logger('Extraction')
+
 
 class TextProcessor:
     """Handles PDF text extraction and line filtering."""
@@ -19,12 +24,23 @@ class TextProcessor:
 
     def extract_content(self, pdf_path: Path) -> str:
         """Extract text content from the first page of a PDF."""
+        if not pdf_path.exists():
+            raise DoctopusPDFNotFoundError(f'PDF file not found: {pdf_path}', pdf_path=pdf_path)
+
         try:
             with pdfplumber.open(pdf_path) as pdf:
+                if not pdf.pages:
+                    return ''  # Empty PDF, not an error
+
                 text = pdf.pages[0].extract_text()
-            return text or ''
-        except Exception:
-            return ''
+                return text or ''  # None becomes empty string, not an error
+
+        except pdfplumber.PDFSyntaxError as e:
+            raise DoctopusPDFError(f'PDF is corrupted or invalid: {pdf_path}', pdf_path=pdf_path) from e
+        except Exception as e:
+            if 'password' in str(e).lower():
+                raise DoctopusPDFError(f'PDF is password protected: {pdf_path}', pdf_path=pdf_path) from e
+            raise DoctopusPDFError(f'Unexpected error opening PDF {pdf_path}: {e}', pdf_path=pdf_path) from e
 
     def reduce_to_relevant_lines(self, content: str) -> list[str]:
         """
@@ -123,7 +139,7 @@ class MetadataExtractor:
             try:
                 parsed = self._parse_date(date_str)
                 return parsed.strftime('%Y%m%d')
-            except Exception:
+            except (ValueError, TypeError, parser.ParserError):
                 continue
 
         return None

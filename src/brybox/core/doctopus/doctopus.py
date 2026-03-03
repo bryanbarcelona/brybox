@@ -6,10 +6,16 @@ Public API:
     DoctopusPrimeNexus — batch-processes a directory of PDFs
 """
 
-from functools import cached_property
 from pathlib import Path
 
 from brybox.core.models.document import DoctopusComponents, ProcessingContext
+from brybox.exceptions.documents import (
+    DoctopusConfigurationError,
+    DoctopusError,
+    DoctopusFileOperationError,
+    DoctopusPDFError,
+    DoctopusPDFNotFoundError,
+)
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
 from brybox.utils.settings import BryboxSettings
 
@@ -64,52 +70,91 @@ class DoctopusPrime:
 
         Returns:
             ProcessingContext populated with all extracted information.
+            If no category is found, context.category will be None and
+            output_filepath will be empty - this is a normal outcome.
+
+        Raises:
+            DoctopusPDFError: If the PDF file is corrupted, missing, or unreadable
+            DoctopusConfigurationError: If configuration is invalid
+            DoctopusFileOperationError: If file system operations fail
         """
         context = ProcessingContext(pdf_filepath=self.pdf_filepath, base_dir=self.base_dir)
 
-        context.content = self.text_processor.extract_content(self.pdf_filepath)
-        context.category = self._classify_document(context.content)
-        context.condensed_lines = self.text_processor.reduce_to_relevant_lines(context.content)
+        try:
+            context.content = self.text_processor.extract_content(self.pdf_filepath)
+        except DoctopusPDFNotFoundError:
+            log_and_display(f'📄 File not found: {self.pdf_filepath.name}', level='error')
+            raise
+        except DoctopusPDFError as e:
+            log_and_display(f'📄 PDF error for {self.pdf_filepath.name}: {e}', level='error')
+            raise
 
-        if context.category:
-            context.condensed_lines = self.special_handler.handle_special_cases(
-                context.category, context.condensed_lines
-            )
+        context.category = self._classify_document(context.content)
+
+        self._last_context = context
+
+        if not context.category:
+            log_and_display(f'⏸️ No category match: {self.pdf_filepath.name}', level='info')
+            return context
+
+        context.condensed_lines = self.text_processor.reduce_to_relevant_lines(context.content)
+        context.condensed_lines = self.special_handler.handle_special_cases(context.category, context.condensed_lines)
 
         context.document_date = self.metadata_extractor.extract_date(context.condensed_lines)
         context.invoice_id = self.metadata_extractor.extract_invoice_id(context.condensed_lines)
 
-        filename_stem = self.path_builder.get_filename_component(context.category or '', self.config)
+        filename_stem = self.path_builder.get_filename_component(context.category, self.config)
         context.output_filename = self.path_builder.build_filename(
             context.document_date, filename_stem, context.invoice_id
         )
 
-        if context.category:
-            context.output_filepath = self.path_builder.build_output_path(
-                context.category, context.output_filename, self.config, self.pdf_filepath
-            )
+        context.output_filepath = self.path_builder.build_output_path(
+            context.category, context.output_filename, self.config, self.pdf_filepath
+        )
 
+        self._last_context = context
         return context
 
     def shuttle_service(self) -> bool:
         """
-        Move the PDF to its organised destination.
+        Move the PDF to its organised destination if categorized.
 
         Returns:
-            True if the file was successfully processed.
+            True if the file was successfully moved (implies it was categorized).
+            False if no category matched (file left in place).
+
+        Raises:
+            DoctopusPDFError: If the PDF file is corrupted, missing, or unreadable
+            DoctopusConfigurationError: If configuration is invalid
+            DoctopusFileOperationError: If file system operations fail
         """
-        context = self.process()
+        try:
+            context = self.process()
+        except DoctopusError:
+            # Already logged in process(), just re-raise
+            raise
 
         if not context.category or not context.output_filepath:
             return False
 
-        success, is_new = self.file_mover.move_file(context.pdf_filepath, context.output_filepath)
+        try:
+            success, is_new = self.file_mover.move_file(context.pdf_filepath, context.output_filepath)
+            context.is_new_file = is_new
 
-        if not success:
-            return False
+            if is_new:
+                log_and_display(f'✅ Moved: {self.pdf_filepath.name} → {context.category}', level='info')
+            else:
+                log_and_display(
+                    f'🔄 Duplicate deleted: {self.pdf_filepath.name} (already exists in {context.category})',
+                    level='info',
+                )
 
-        context.is_new_file = is_new
-        return True
+            self._last_context = context
+            return success
+
+        except DoctopusFileOperationError as e:
+            log_and_display(f'💾 File operation failed for {self.pdf_filepath.name}: {e}', level='error')
+            raise
 
     def _classify_document(self, content: str) -> str | None:
         """Return the first category whose triggers all appear in content, or None."""
@@ -118,17 +163,17 @@ class DoctopusPrime:
                 return category
         return None
 
-    @cached_property
+    @property
     def category(self) -> str | None:
-        return self.process().category
+        return self._last_context.category if self._last_context else None
 
-    @cached_property
+    @property
     def document_date(self) -> str | None:
-        return self.process().document_date
+        return self._last_context.document_date if self._last_context else None
 
-    @cached_property
+    @property
     def invoice_id(self) -> str | None:
-        return self.process().invoice_id
+        return self._last_context.invoice_id if self._last_context else None
 
 
 class DoctopusPrimeNexus:
@@ -158,7 +203,7 @@ class DoctopusPrimeNexus:
         self.processor_class = processor_class
         self.config = config or BryboxSettings().doctopus
 
-    def process_all(self, progress_bar: bool = True) -> dict[str, bool]:
+    def process_all(self, progress_bar: bool = True) -> dict[str, dict]:
         """
         Process all PDF files in the configured directory.
 
@@ -166,8 +211,20 @@ class DoctopusPrimeNexus:
             progress_bar: Whether to show a progress bar.
 
         Returns:
-            Dict mapping each file path to its success status.
+            Dict mapping each file path to a result dict:
+            {
+                'success': bool,      # True if no errors occurred
+                'processed': bool,    # True if file was categorized AND moved
+                'category': str|None, # Category if found
+                'error': str|None     # Error message if any
+            }
+
+        Raises:
+            DoctopusConfigurationError: If configuration is fundamentally broken
         """
+        if not self.dir_path.exists():
+            raise DoctopusConfigurationError(f'Directory does not exist: {self.dir_path}', pdf_path=self.dir_path)
+
         pdf_files = list(self.dir_path.glob('*.pdf'))
 
         log_and_display(f'Processing {len(pdf_files)} PDF file(s) in {self.dir_path}', sticky=True)
@@ -179,7 +236,10 @@ class DoctopusPrimeNexus:
         )
 
         results = {}
+
         for pdf_file in iterable:
+            result = {'success': False, 'processed': False, 'category': None, 'error': None}
+
             try:
                 processor = self.processor_class(
                     pdf_filepath=pdf_file,
@@ -187,9 +247,29 @@ class DoctopusPrimeNexus:
                     config=self.config,
                     dry_run=self.dry_run,
                 )
-                results[pdf_file] = processor.shuttle_service()
-            except Exception as e:
-                log_and_display(f'Error processing {pdf_file}: {e}')
-                results[pdf_file] = False
+
+                moved = processor.shuttle_service()
+
+                result['success'] = True
+                result['processed'] = moved
+                result['category'] = processor.category
+
+            except DoctopusError as e:
+                result['error'] = str(e)
+                # No logging here - Prime already logged it
+
+            except Exception as e:  # noqa: BLE001
+                result['error'] = f'Unexpected error: {e}'
+                log_and_display(f'💥 Unexpected error for {pdf_file.name}: {e}', level='error')
+
+            finally:
+                results[str(pdf_file)] = result
+
+        # Summary
+        successful = sum(1 for r in results.values() if r['success'])
+        processed = sum(1 for r in results.values() if r['processed'])
+        log_and_display(
+            f'Completed: {processed} moved, {successful - processed} skipped, {len(results) - successful} failed'
+        )
 
         return results

@@ -5,8 +5,12 @@ Output path construction for the Doctopus pipeline.
 from pathlib import Path
 from typing import Any
 
+from brybox.exceptions.documents import DoctopusConfigurationError, DoctopusFileOperationError
 from brybox.utils.deduplicator import HashDeduplicator
+from brybox.utils.logging import get_configured_logger
 from brybox.utils.naming import resolve_filename_conflict
+
+logger = get_configured_logger('Path Builder')
 
 
 class PathBuilder:
@@ -31,28 +35,47 @@ class PathBuilder:
         category_config = config.get('categories', {}).get(category, {})
         return category_config.get('filename', category)
 
-    def build_output_path(
-        self, category: str, filename: str, config: dict[str, Any], pdf_filepath: Path
-    ) -> Path | None:
+    def build_output_path(self, category: str, filename: str, config: dict[str, Any], pdf_filepath: Path) -> Path:
         """
         Construct the full destination path for a processed PDF.
 
-        Returns None if the category is not recognised in config.
         Detects duplicates via SHA-256 hash comparison.
         Delegates conflict resolution to utils.naming.resolve_filename_conflict.
+
+        Raises:
+            DoctopusConfigurationError: Category not found in config
+            DoctopusFileOperationError: Duplicate detection failed
         """
         categories = config.get('categories', {})
 
         if category not in categories:
-            return None
+            raise DoctopusConfigurationError(
+                f"Unknown category '{category}' - check your configuration", pdf_path=pdf_filepath
+            )
 
         relative_path = categories[category].get('output_path', '')
         filepath = self.base_dir / relative_path / filename
 
+        # If file doesn't exist, we're done
         if not filepath.is_file():
             return filepath
 
-        if HashDeduplicator().is_duplicate(pdf_filepath, filepath):
-            return filepath
+        # Check if it's a duplicate
+        try:
+            if HashDeduplicator().is_duplicate(pdf_filepath, filepath):
+                return filepath
+        except Exception as e:
+            raise DoctopusFileOperationError(
+                f'Failed to check for duplicate between {pdf_filepath} and {filepath}: {e}',
+                source_path=pdf_filepath,
+                dest_path=filepath,
+            ) from e
 
-        return resolve_filename_conflict(filepath)
+        # Resolve conflict
+        try:
+            resolved = resolve_filename_conflict(filepath)
+            return resolved
+        except Exception as e:
+            raise DoctopusFileOperationError(
+                f'Failed to resolve filename conflict for {filepath}: {e}', source_path=pdf_filepath, dest_path=filepath
+            ) from e
