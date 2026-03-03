@@ -29,8 +29,8 @@ class FileMover:
         Move source to destination.
 
         Returns:
-            (success, is_new_file) — is_new_file is False when the destination
-            already existed and the source was deleted as a duplicate.
+            (success, is_healthy) — is_healthy is False if the move failed
+            or the file is corrupted.
         """
         if not source.exists():
             raise DoctopusPDFNotFoundError(f'Source file does not exist: {source}', pdf_path=source)
@@ -57,7 +57,7 @@ class FileMover:
                 f'Moved file appears corrupted: {destination}', source_path=source, dest_path=destination
             )
 
-        publish_file_moved(source, destination, file_size, is_new=True)
+        publish_file_moved(source, destination, file_size, is_healthy=True)
         return True, True
 
     @staticmethod

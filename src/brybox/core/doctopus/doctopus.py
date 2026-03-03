@@ -63,7 +63,7 @@ class DoctopusPrime:
         self.metadata_extractor = c.metadata_extractor(self.config)
         self.special_handler = c.special_handler()
         self.path_builder = c.path_builder(self.base_dir)
-        self.file_mover = c.file_mover(dry_run)
+        self.file_mover = c.file_mover(dry_run=dry_run)
 
     def process(self) -> ProcessingContext:
         """
