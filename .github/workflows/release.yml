@@ -9,7 +9,6 @@ permissions:
   id-token: write
 
 jobs:
-
   skip-check:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -52,14 +51,11 @@ jobs:
       - uses: actions/setup-python@v5
       - uses: astral-sh/setup-uv@v3
 
-
       - name: Sync dependencies
-        run: |
-          uv sync --all-extras --dev --frozen
+        run: uv sync --all-extras --dev --frozen
 
       - name: Install commitizen
-        run: |
-          uv tool install commitizen
+        run: uv tool install commitizen
 
       - name: Bump version, changelog & tag (prepare only)
         id: cz
@@ -74,45 +70,11 @@ jobs:
         env:
           ACT: ${{ env.ACT }}
 
-      - name: Get current version
-        id: current
-        run: |
-          CURRENT=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0")
-          echo "current=$CURRENT" >> $GITHUB_OUTPUT
-
-      - name: Detect real bump
-        id: bump
-        run: |
-          if [[ "${{ steps.cz.outputs.version }}" == "${{ steps.current.current }}" || -z "${{ steps.cz.outputs.version }}" ]]; then
-            echo "::notice::No version increment → skipping publish/release"
-            echo "proceed=false" >> $GITHUB_OUTPUT
-          else
-            echo "proceed=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Build distribution packages
-        if: steps.bump.outputs.proceed == 'true'
-        #if: steps.cz.outputs.version != ''
-        run: uv build
-
-      - name: Publish to PyPI
-        if: steps.bump.outputs.proceed == 'true'
-        #if: steps.cz.outputs.version != ''
-        run: |
-          if [[ "$ACT" == "true" ]]; then
-            echo "🟢 LOCAL SIMULATION: WOULD PUBLISH → dist/*.whl + dist/*.tar.gz to PyPI"
-            ls -la dist/
-          else
-            echo "🔴 ACTUAL: Publishing to PyPI..."
-            uv publish
-          fi
-
       - name: Push commit & tag to repository
-        if: steps.bump.outputs.proceed == 'true'
-        #if: steps.cz.outputs.version != ''
+        if: steps.cz.outputs.version != ''
         run: |
           if [[ "$ACT" == "true" ]]; then
-            echo "🟢 LOCAL SIMULATION: WOULD PUSH → commit and tag v${{ steps.cz.outputs.version }} to repo"
+            echo "🟢 LOCAL SIMULATION: WOULD PUSH → commit and tag v${{ steps.cz.outputs.version }}"
             echo "Commit that would be pushed:"
             git log -1 --oneline
             echo "Tag that would be pushed: v${{ steps.cz.outputs.version }}"
@@ -122,33 +84,36 @@ jobs:
             git push origin v${{ steps.cz.outputs.version }}
           fi
 
+      - name: Build distribution packages
+        if: steps.cz.outputs.version != ''
+        run: uv build
+
+      - name: Publish to PyPI
+        if: steps.cz.outputs.version != ''
+        run: |
+          if [[ "$ACT" == "true" ]]; then
+            echo "🟢 LOCAL SIMULATION: WOULD PUBLISH → dist/*.whl + dist/*.tar.gz to PyPI"
+            ls -la dist/
+          else
+            echo "🔴 ACTUAL: Publishing to PyPI..."
+            uv publish --index testpypi
+          fi
+
   release:
     needs: publish
     if: ${{ needs.publish.result == 'success' && needs.publish.outputs.version != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Checkout code
-        if: steps.bump.outputs.proceed == 'true' && env.ACT != 'true'
-        #if: env.ACT != 'true'
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
+          ref: v${{ needs.publish.outputs.version }}
           token: ${{ secrets.PAT }}
-
-      - name: Fake checkout for local simulation
-        if: steps.bump.outputs.proceed == 'true' && env.ACT != 'true'
-        #if: env.ACT == 'true'
-        run: |
-          echo "🟢 LOCAL SIMULATION: WOULD CHECKOUT v${{ needs.publish.outputs.version }}"
-          mkdir -p dist
-          # Copy dist files from publish job if needed
 
       - uses: astral-sh/setup-uv@v3
 
       - name: Build release assets
-        if: steps.bump.outputs.proceed == 'true'
         run: |
           if [[ "$ACT" == "true" ]]; then
             echo "🟢 LOCAL SIMULATION: WOULD BUILD release assets"
@@ -157,7 +122,6 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        if: steps.bump.outputs.proceed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -166,10 +130,21 @@ jobs:
             echo "WOULD ATTACH FILES:"
             ls -la dist/*.whl dist/*.tar.gz 2>/dev/null || echo "  (no dist files found)"
           else
-            echo "🔴 ACTUAL: Creating GitHub Release..."
+            echo "🔴 ACTUAL: Checking if release exists..."
+            if gh release view v${{ needs.publish.outputs.version }} >/dev/null 2>&1; then
+              echo "Release v${{ needs.publish.outputs.version }} already exists → skipping"
+              exit 0
+            fi
+            echo "Creating GitHub Release..."
             gh release create v${{ needs.publish.outputs.version }} dist/*.whl dist/*.tar.gz --generate-notes
           fi
 
-      - name: Debug - Release created
-        if: success()
-        run: echo "::notice::✅ Release v${{ needs.publish.outputs.version }} created successfully"
+  debug-outputs:
+    needs: publish
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Print all relevant values
+        run: |
+          echo "publish result = ${{ needs.publish.result }}"
+          echo "version output = '${{ needs.publish.outputs.version }}'"
