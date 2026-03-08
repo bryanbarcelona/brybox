@@ -1,3 +1,26 @@
+## v0.7.0 (2026-03-08)
+
+### Feat
+
+- **doctopus**: implement comprehensive exception handling and logging architecture
+
+### Fix
+
+- **doctopus**: align event param name and fix positional init crash
+- **inbox_kraken**: improve Dropbox audio logging to show filename instead of long URL
+- **inbox_kraken**: add future import to resolve ProcessResult name error
+
+### Refactor
+
+- **doctopus**: fix Ruff linting and improve code structure
+- **doctopus**: decompose monolith into focused modules
+- **deduplicator**: expand HashDeduplicator with static is_duplicate method
+- **logging**: move VERBOSE_LOGGING & _CONFIGURED_LOGGERS to utils/logging.py
+- **inbox_kraken**: core submodule linting and engine cleanup
+- **exceptions**: implement centralized error hierarchy
+- **inbox_kraken**: introduce ProcessingContext for handler uniformity
+- **core**: decompose monolithic inbox_kraken.py into modular architecture
+
 ## v0.6.0 (2026-02-22)
 
 ### BREAKING CHANGE
