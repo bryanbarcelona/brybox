@@ -38,6 +38,9 @@ configs/*.json
 
 !configs/*.example.json
 
+# Local Github Actions Runner
+.actrc
+
 # Still under development - ignore
 
 tester.py

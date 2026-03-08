@@ -36,9 +36,8 @@ jobs:
       - name: Cache uv
         uses: actions/cache@v4
         with:
-          key: uv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
           restore-keys: |
-            uv-${{ runner.os }}-py${{ matrix.python-version }}-
             uv-${{ runner.os }}-
           path: ~/.cache/uv
 
@@ -62,7 +61,7 @@ jobs:
 
       - name: Test + coverage
         if: steps.check_tests.outputs.has_tests == 'true'
-        run: uv run pytest --cov=himmel --cov-report=xml
+        run: uv run pytest --cov=brybox --cov-report=xml   # ← change package name when reusing
 
       - name: Upload coverage
         if: steps.check_tests.outputs.has_tests == 'true'

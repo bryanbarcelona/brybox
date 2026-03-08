@@ -9,13 +9,38 @@ permissions:
   id-token: write
 
 jobs:
+
+  skip-check:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      is-release-commit: ${{ steps.check.outputs.is_release == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT }}
+
+      - id: check
+        name: Detect release commit
+        run: |
+          MSG=$(git log -1 --pretty=%s)
+          echo "Last commit: $MSG"
+          if [[ "$MSG" == "chore(release):"* ]]; then
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
   tests:
     uses: ./.github/workflows/ci.yml
 
   publish:
-    needs: tests
+    needs: [tests, skip-check]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.skip-check.outputs.is-release-commit != 'true'
     outputs:
       version: ${{ steps.cz.outputs.version }}
     steps:
@@ -27,10 +52,16 @@ jobs:
       - uses: actions/setup-python@v5
       - uses: astral-sh/setup-uv@v3
 
-      - run: uv sync --all-extras --dev --frozen
-      - run: uv tool install commitizen
 
-      - name: Bump version, changelog & tag  (prepare only)
+      - name: Sync dependencies
+        run: |
+          uv sync --all-extras --dev --frozen
+
+      - name: Install commitizen
+        run: |
+          uv tool install commitizen
+
+      - name: Bump version, changelog & tag (prepare only)
         id: cz
         uses: commitizen-tools/commitizen-action@0.26.0
         with:
@@ -39,45 +70,105 @@ jobs:
           git_email: "bryan.barcelona@gmail.com"
           push: false
           changelog: true
-          no_raise: 21
-          
+          no_raise: 3,21
+        env:
+          ACT: ${{ env.ACT }}
+
+      - name: Get current version
+        id: current
+        run: |
+          CURRENT=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0")
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+
+      - name: Detect real bump
+        id: bump
+        run: |
+          if [[ "${{ steps.cz.outputs.version }}" == "${{ steps.current.current }}" || -z "${{ steps.cz.outputs.version }}" ]]; then
+            echo "::notice::No version increment → skipping publish/release"
+            echo "proceed=false" >> $GITHUB_OUTPUT
+          else
+            echo "proceed=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build distribution packages
-        if: steps.cz.outputs.version != ''
+        if: steps.bump.outputs.proceed == 'true'
+        #if: steps.cz.outputs.version != ''
         run: uv build
 
       - name: Publish to PyPI
-        if: steps.cz.outputs.version != ''
-        run: uv publish
+        if: steps.bump.outputs.proceed == 'true'
+        #if: steps.cz.outputs.version != ''
+        run: |
+          if [[ "$ACT" == "true" ]]; then
+            echo "🟢 LOCAL SIMULATION: WOULD PUBLISH → dist/*.whl + dist/*.tar.gz to PyPI"
+            ls -la dist/
+          else
+            echo "🔴 ACTUAL: Publishing to PyPI..."
+            uv publish
+          fi
 
       - name: Push commit & tag to repository
-        if: steps.cz.outputs.version != ''
+        if: steps.bump.outputs.proceed == 'true'
+        #if: steps.cz.outputs.version != ''
         run: |
-          git push origin HEAD:main
-          git push origin v${{ steps.cz.outputs.version }}
+          if [[ "$ACT" == "true" ]]; then
+            echo "🟢 LOCAL SIMULATION: WOULD PUSH → commit and tag v${{ steps.cz.outputs.version }} to repo"
+            echo "Commit that would be pushed:"
+            git log -1 --oneline
+            echo "Tag that would be pushed: v${{ steps.cz.outputs.version }}"
+          else
+            echo "🔴 ACTUAL: Pushing to GitHub..."
+            git push origin HEAD:main
+            git push origin v${{ steps.cz.outputs.version }}
+          fi
 
   release:
     needs: publish
-    if: ${{ needs.publish.outputs.version != '' }}
+    if: ${{ needs.publish.result == 'success' && needs.publish.outputs.version != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        if: steps.bump.outputs.proceed == 'true' && env.ACT != 'true'
+        #if: env.ACT != 'true'
+        uses: actions/checkout@v4
         with:
-          ref: v${{ needs.publish.outputs.version }}
+          token: ${{ secrets.PAT }}
+
+      - name: Fake checkout for local simulation
+        if: steps.bump.outputs.proceed == 'true' && env.ACT != 'true'
+        #if: env.ACT == 'true'
+        run: |
+          echo "🟢 LOCAL SIMULATION: WOULD CHECKOUT v${{ needs.publish.outputs.version }}"
+          mkdir -p dist
+          # Copy dist files from publish job if needed
 
       - uses: astral-sh/setup-uv@v3
-      - run: uv build
+
+      - name: Build release assets
+        if: steps.bump.outputs.proceed == 'true'
+        run: |
+          if [[ "$ACT" == "true" ]]; then
+            echo "🟢 LOCAL SIMULATION: WOULD BUILD release assets"
+          else
+            uv build
+          fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.publish.outputs.version }}
-          generate_release_notes: true
-          files: |
-            dist/*.whl
-            dist/*.tar.gz
+        if: steps.bump.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "$ACT" == "true" ]]; then
+            echo "🟢 LOCAL SIMULATION: WOULD CREATE GITHUB RELEASE → v${{ needs.publish.outputs.version }}"
+            echo "WOULD ATTACH FILES:"
+            ls -la dist/*.whl dist/*.tar.gz 2>/dev/null || echo "  (no dist files found)"
+          else
+            echo "🔴 ACTUAL: Creating GitHub Release..."
+            gh release create v${{ needs.publish.outputs.version }} dist/*.whl dist/*.tar.gz --generate-notes
+          fi
 
       - name: Debug - Release created
         if: success()
