@@ -96,7 +96,7 @@ jobs:
             ls -la dist/
           else
             echo "🔴 ACTUAL: Publishing to PyPI..."
-            uv publish --index testpypi
+            uv publish
           fi
 
   release:
