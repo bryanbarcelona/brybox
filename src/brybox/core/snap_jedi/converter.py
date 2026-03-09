@@ -3,13 +3,15 @@ import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from ...utils.logging import get_configured_logger
+from brybox.exceptions.images import (
+    SnapJediConversionFailedError,
+    SnapJediConversionTimeoutError,
+    SnapJediFileOperationError,
+    SnapJediToolNotFoundError,
+)
+from brybox.utils.logging import get_configured_logger
 
 logger = get_configured_logger('ImageConverter')
-
-
-class ConversionError(Exception):
-    """Raised when image conversion fails."""
 
 
 class ImageConverter(ABC):
@@ -25,7 +27,7 @@ class ImageConverter(ABC):
             target: Target JPG path
 
         Raises:
-            ConversionError: If conversion fails
+            SnapJediConversionError: If conversion fails
         """
 
 
@@ -68,31 +70,42 @@ class ImageMagickConverter(ImageConverter):
             result = subprocess.run(
                 command,
                 check=False,
-                shell=True,
                 capture_output=True,
                 text=True,
                 timeout=30,  # Prevent hanging on large files
             )
 
             if result.returncode != 0:
-                raise ConversionError(f'ImageMagick conversion failed: {result.stderr}')
+                raise SnapJediConversionFailedError(
+                    f'ImageMagick conversion failed: {result.stderr}', image_path=source, stderr=result.stderr
+                )
 
             # mogrify creates source_name.jpg in same directory
             intermediate = source.with_suffix('.jpg')
 
             if not intermediate.exists():
-                raise ConversionError(f'ImageMagick did not create expected output: {intermediate}')
+                raise SnapJediConversionFailedError(
+                    f'ImageMagick did not create expected output: {intermediate}', image_path=source
+                )
 
             # Move to target if different from intermediate
             if intermediate != target:
-                intermediate.rename(target)
+                try:
+                    intermediate.rename(target)
+                except (PermissionError, OSError) as e:
+                    raise SnapJediFileOperationError(
+                        f'Failed to move converted image from {intermediate} to {target}',
+                        source_path=intermediate,
+                        dest_path=target,
+                    ) from e
 
-        except subprocess.TimeoutExpired:
-            raise ConversionError('Conversion timed out after 30 seconds')
-        except Exception as e:
-            raise ConversionError(f'Conversion failed: {e!s}')
+        except subprocess.TimeoutExpired as e:
+            raise SnapJediConversionTimeoutError(
+                'Conversion timed out after 30 seconds', image_path=source, timeout_seconds=30
+            ) from e
 
-    def _find_mogrify(self) -> str:
+    @staticmethod
+    def _find_mogrify() -> str:
         """
         Locate mogrify command.
 
@@ -115,4 +128,4 @@ class ImageMagickConverter(ImageConverter):
         if shutil.which('mogrify'):
             return 'mogrify'
 
-        raise RuntimeError('ImageMagick not found. Install ImageMagick 6 or 7.')
+        raise SnapJediToolNotFoundError('ImageMagick not found. Install ImageMagick 6 or 7.', tool_name='ImageMagick')

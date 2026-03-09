@@ -8,7 +8,13 @@ import pytz
 from exiftool.exceptions import ExifToolExecuteError
 from timezonefinder import TimezoneFinder
 
-from ...utils.logging import log_and_display
+from brybox.exceptions.images import (
+    SnapJediImageNotFoundError,
+    SnapJediMetadataError,
+    SnapJediMetadataParseError,
+    SnapJediMetadataReadError,
+    SnapJediToolNotFoundError,
+)
 
 
 @dataclass
@@ -58,15 +64,28 @@ class MetadataReader:
 
         Returns:
             ImageMetadata with extracted information
+
+        Raises:
+            SnapJediImageNotFoundError: If image file doesn't exist
+            SnapJediMetadataReadError: If metadata cannot be read
+            SnapJediMetadataParseError: If metadata parsing fails
         """
-        # 1. Read raw EXIF
+        if not file_path.exists():
+            raise SnapJediImageNotFoundError(f'Image not found: {file_path}', image_path=file_path)
+
         raw_exif = self._read_exif(file_path)
 
-        # 2. Extract structured data
-        creation_date = self._extract_creation_date(raw_exif)
-        gps_lat, gps_lon, gps_alt = self._extract_gps_coordinates(raw_exif)
-        timezone = self._calculate_timezone(gps_lat, gps_lon, gps_alt)
-        time_offset = self._determine_time_offset(raw_exif, timezone, creation_date)
+        try:
+            creation_date = self._extract_creation_date(raw_exif, file_path)
+            gps_lat, gps_lon, gps_alt = self._extract_gps_coordinates(raw_exif)
+            timezone = self._calculate_timezone(gps_lat, gps_lon, gps_alt)
+            time_offset = self._determine_time_offset(raw_exif, timezone, creation_date, file_path)
+        except SnapJediMetadataError:
+            raise
+        except Exception as e:
+            raise SnapJediMetadataError(
+                f'Unexpected error extracting metadata from {file_path.name}: {e}', image_path=file_path
+            ) from e
 
         return ImageMetadata(
             creation_date=creation_date,
@@ -78,7 +97,8 @@ class MetadataReader:
             raw_exif=raw_exif,
         )
 
-    def _read_exif(self, file_path: Path) -> dict:
+    @staticmethod
+    def _read_exif(file_path: Path) -> dict:
         """
         Read raw EXIF data using exiftool.
 
@@ -87,16 +107,25 @@ class MetadataReader:
 
         Returns:
             Dictionary of EXIF tags and values
+
+        Raises:
+            SnapJediMetadataReadError: If exiftool fails
         """
         try:
             with exiftool.ExifToolHelper() as et:
                 metadata = et.get_metadata(str(file_path))[0]
                 return metadata
         except ExifToolExecuteError as e:
-            log_and_display(f'Failed to read EXIF from {file_path.name}: {e}', level='error')
-            return {}
+            raise SnapJediMetadataReadError(
+                f'Failed to read EXIF from {file_path.name}: {e}', image_path=file_path, stderr=str(e)
+            ) from e
+        except IndexError as e:
+            raise SnapJediMetadataReadError(
+                f'Exiftool returned empty result for {file_path.name}', image_path=file_path
+            ) from e
 
-    def _extract_creation_date(self, raw_exif: dict) -> datetime | None:
+    @staticmethod
+    def _extract_creation_date(raw_exif: dict, file_path: Path) -> datetime | None:
         """
         Extract creation date from EXIF data.
 
@@ -106,29 +135,38 @@ class MetadataReader:
 
         Args:
             raw_exif: Raw EXIF dictionary
+            file_path: Path to image (for error context)
 
         Returns:
-            Parsed datetime or None if not found/invalid
+            Parsed datetime or None if not found
+
+        Raises:
+            SnapJediMetadataParseError: If date string exists but cannot be parsed
         """
         # Try DateTimeOriginal first (preferred)
         if 'EXIF:DateTimeOriginal' in raw_exif:
             date_str = raw_exif['EXIF:DateTimeOriginal']
             try:
                 return datetime.strptime(date_str, '%Y:%m:%d %H:%M:%S')
-            except ValueError:
-                log_and_display(f'Failed to parse DateTimeOriginal: {date_str}', level='warning')
+            except ValueError as e:
+                raise SnapJediMetadataParseError(
+                    f'Failed to parse DateTimeOriginal: {date_str}', image_path=file_path, field='DateTimeOriginal'
+                ) from e
 
         # Fall back to CreateDate
         if 'EXIF:CreateDate' in raw_exif:
             date_str = raw_exif['EXIF:CreateDate']
             try:
                 return datetime.strptime(date_str, '%Y:%m:%d %H:%M:%S')
-            except ValueError:
-                log_and_display(f'Failed to parse CreateDate: {date_str}', level='warning')
+            except ValueError as e:
+                raise SnapJediMetadataParseError(
+                    f'Failed to parse CreateDate: {date_str}', image_path=file_path, field='CreateDate'
+                ) from e
 
         return None
 
-    def _extract_gps_coordinates(self, raw_exif: dict) -> tuple[float, float, float]:
+    @staticmethod
+    def _extract_gps_coordinates(raw_exif: dict) -> tuple[float, float, float]:
         """
         Extract GPS coordinates from EXIF data.
 
@@ -162,8 +200,9 @@ class MetadataReader:
 
         return self.timezone_finder.timezone_at(lng=longitude, lat=latitude)
 
+    @staticmethod
     def _determine_time_offset(
-        self, raw_exif: dict, timezone: str | None, creation_date: datetime | None
+        raw_exif: dict, timezone: str | None, creation_date: datetime | None, file_path: Path
     ) -> int | None:
         """
         Determine timezone offset in hours.
@@ -189,10 +228,12 @@ class MetadataReader:
                 try:
                     # Format is typically "+05:00" or "-05:00"
                     hours = int(offset_str.split(':')[0])
+                except (ValueError, IndexError) as e:
+                    raise SnapJediMetadataParseError(
+                        f'Failed to parse offset from {key}: {offset_str}', image_path=file_path, field=key
+                    ) from e
+                else:
                     return hours
-                except (ValueError, IndexError):
-                    log_and_display(f'Failed to parse offset from {key}: {offset_str}', level='warning')
-                    continue
 
         # Fall back to calculating from timezone
         if timezone and creation_date:
@@ -203,12 +244,15 @@ class MetadataReader:
                 if delta is None:  # <-- guard
                     return None
                 return int(delta.total_seconds() / 3600)
+            except (pytz.UnknownTimeZoneError, pytz.NonExistentTimeError, pytz.AmbiguousTimeError):
+                return None
             except Exception as e:
-                log_and_display(f'Failed to calculate offset from timezone: {e}', level='warning')
+                raise SnapJediMetadataParseError(
+                    f'Unexpected error calculating timezone offset: {e}', image_path=file_path, field='timezone_offset'
+                ) from e
 
-        return None
-
-    def _find_exiftool(self) -> str:
+    @staticmethod
+    def _find_exiftool() -> str:
         """
         Locate exiftool binary.
 
@@ -231,4 +275,6 @@ class MetadataReader:
         if shutil.which('exiftool'):
             return 'exiftool'
 
-        raise RuntimeError('exiftool not found. Install exiftool or place in assets/bin/')
+        raise SnapJediToolNotFoundError(
+            'exiftool not found. Install exiftool or place in assets/bin/', tool_name='exiftool'
+        )

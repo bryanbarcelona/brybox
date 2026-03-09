@@ -14,10 +14,64 @@ from brybox import (
     InboxKraken
 )
 from logging_config import configure_logging
-from test_env_resetter import testing_doctopus
+from test_env_resetter import testing_doctopus, testing_pixelporter
 
 logger = logging.getLogger('BryBox')
 
+import subprocess
+from typing import Optional
+
+def run_twincheck(
+    source_dir: str,
+    target_dir: str,
+    hash_mode: str = "off"
+) -> Optional[subprocess.CompletedProcess]:
+    """
+    Runs the 'ds twincheck' command to compare two directories.
+
+    Args:
+        source_dir (str): Path to the source directory.
+        target_dir (str): Path to the target directory.
+        hash_mode (str): Hash comparison mode (default: "strict").
+
+    Returns:
+        subprocess.CompletedProcess: Result object if successful.
+        None: If the command fails.
+
+    Raises:
+        FileNotFoundError: If the 'ds' command is not found.
+    """
+    command = [
+        "ds",
+        "twincheck",
+        "-a", source_dir,
+        "-b", target_dir,
+        "--hash-mode", hash_mode
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        print("Twincheck completed successfully!")
+        if result.stdout:
+            print("Output:", result.stdout)
+        return result
+
+    except subprocess.CalledProcessError as e:
+        print(f"Twincheck failed with return code {e.returncode}")
+        if e.stderr:
+            print("Error Output:", e.stderr)
+        if e.stdout:
+            print("Partial Output:", e.stdout)
+        return None
+
+    except FileNotFoundError:
+        print("Error: The 'ds' command was not found. Please ensure it is added to your system PATH.")
+        raise
 
 def main():
     # print("IN MAIN: root handlers =", len(logging.getLogger().handlers))
@@ -71,13 +125,15 @@ def test_pixelporter():
     configure_logging()
     enable_verbose_logging()
 
-    # logger.setLevel(logging.INFO)
-    # logger.info("Logging is configured.")
     log_and_display('Logging is configured.', sticky=True)
 
+    log_and_display("🚀 Starting Pixelporter Smoke Test...")
+
+    testing_pixelporter()
+
     # Define paths (adjust to your test directories)
-    source_dir = Path(r'D:\BryBoxTesting\PixelporterTest\20251003\src')
-    target_dir = Path(r'D:\BryBoxTesting\PixelporterTest\20251003\dst')
+    source_dir = Path(r'D:\BryBoxTesting\PixelporterTest\src')
+    target_dir = Path(r'D:\BryBoxTesting\PixelporterTest\dst')
 
     # Initialize verifier
     verifier = DirectoryVerifier(str(source_dir), str(target_dir))
@@ -95,16 +151,16 @@ def test_pixelporter():
     # Real run
     print('\n=== REAL RUN ===')
     result = push_photos(
-        # source=source_dir,
-        # target=target_dir,
+        source=source_dir,
+        target=target_dir,
         dry_run=False
     )
 
     print(f'\nReal run results: Processed={result.processed}, Skipped={result.skipped}, Failed={result.failed}')
 
     result = push_videos(
-        # source=source_dir,
-        # target=target_dir,
+        source=source_dir,
+        target=target_dir,
         dry_run=False
     )
 
@@ -119,6 +175,7 @@ def test_pixelporter():
         print('❌ Verification failed!')
         return False
 
+    #run_twincheck(r"D:\\BryBoxTesting\\PixelporterTest\\", r"D:BryBoxTesting\\PixelporterExpected\\")
     print('✅ All operations verified successfully')
     return True
 
@@ -281,7 +338,7 @@ def full_run_test():
 
 if __name__ == '__main__':
     # main()
-    # test_pixelporter()
+    test_pixelporter()
     # test_videosith()
     # test_audiora()
     # test_inbox_kraken()

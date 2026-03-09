@@ -14,7 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from ..events.bus import publish_file_deleted
+from brybox.events.bus import publish_file_deleted
+
 from .logging import log_and_display
 
 
