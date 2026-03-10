@@ -44,16 +44,12 @@ def process_and_cleanup(
 
     for source_path, temp_image_path, _temp_sidecar_paths in mappings:
         try:
-            # Instantiate processor
             processor = processor_class()
 
-            # Open temp file
             processor.open(temp_image_path)
 
-            # Process (convert/rename)
             process_result: ProcessResult = processor.process()
 
-            # Check success
             if not process_result.success:
                 error_msg = process_result.error_message or 'Unknown error'
                 log_and_display(f'✗ Processing failed: {temp_image_path.name} - {error_msg}', level='error')
@@ -61,21 +57,18 @@ def process_and_cleanup(
                 result.errors.append(f'{temp_image_path.name}: {error_msg}')
                 continue
 
-            # Check health
             if not process_result.is_healthy:
                 log_and_display(f'✗ Health check failed: {temp_image_path.name}', level='error')
                 result.failed += 1
                 result.errors.append(f'{temp_image_path.name}: Health check failed')
                 continue
 
-            # Verify output exists
             if not process_result.target_path.exists():
                 log_and_display(f'✗ Output file missing: {process_result.target_path.name}', level='error')
                 result.failed += 1
                 result.errors.append(f'{temp_image_path.name}: Output file not found')
                 continue
 
-            # Success - publish rename event
             publish_file_renamed(
                 old_path=str(temp_image_path),
                 new_path=str(process_result.target_path),
@@ -85,10 +78,8 @@ def process_and_cleanup(
 
             result.processed += 1
 
-            # Clean up source (image + sidecars)
             deleted_files = AppleSidecarManager.delete_image_with_sidecars(source_path)
 
-            # Log success
             sidecar_count = len(deleted_files) - 1  # Subtract the image itself
             log_and_display(
                 f'✓ Processed: {source_path.name} → {process_result.target_path.name} '

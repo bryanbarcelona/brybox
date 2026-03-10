@@ -52,7 +52,8 @@ class DirectoryVerifier:
             f'Target: {len(self.initial_target_files)} files'
         )
 
-    def _scan_directory(self, directory: str) -> set[str]:
+    @staticmethod
+    def _scan_directory(directory: str) -> set[str]:
         """
         Scan directory and return set of all file paths.
 
@@ -205,7 +206,8 @@ class DirectoryVerifier:
 
         return overall_success
 
-    def _verify_directory(self, dir_name: str, expected: set[str], actual: set[str]) -> bool:
+    @staticmethod
+    def _verify_directory(dir_name: str, expected: set[str], actual: set[str]) -> bool:
         """
         Compare expected vs actual file sets for a directory.
 

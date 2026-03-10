@@ -75,7 +75,7 @@ class FFmpegConverter(VideoConverter):
             str(target),
         ]
 
-        # Fallback: re-encode
+        # Fallback re-encode
         fallback_cmd = [
             self.ffmpeg_path,
             '-i',
@@ -138,7 +138,8 @@ class FFmpegConverter(VideoConverter):
                 target.unlink()
             raise ConversionError(f'Conversion failed: {e!s}')
 
-    def _find_ffmpeg(self) -> str:
+    @staticmethod
+    def _find_ffmpeg() -> str:
         """
         Locate ffmpeg command.
 

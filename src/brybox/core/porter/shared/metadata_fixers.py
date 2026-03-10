@@ -8,7 +8,8 @@ from brybox.utils.logging import log_and_display
 class ExifTimestampFixer:
     """Fixes overlapping EXIF timestamps in image files."""
 
-    def fix_metadata(self, mappings: list[tuple[Path, Path, list[Path]]], dry_run: bool, action_prefix: str) -> None:
+    @staticmethod
+    def fix_metadata(mappings: list[tuple[Path, Path, list[Path]]], dry_run: bool, action_prefix: str) -> None:
         """
         Ensure unique DateTimeOriginal EXIF values (Phase 2b).
 

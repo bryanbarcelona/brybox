@@ -122,7 +122,8 @@ class MetadataWriter:
         except Exception as e:
             raise MetadataWriteError(f'Failed to set GPS coordinates: {e!s}') from e
 
-    def _find_exiftool(self) -> str:
+    @staticmethod
+    def _find_exiftool() -> str:
         """
         Locate exiftool binary.
 

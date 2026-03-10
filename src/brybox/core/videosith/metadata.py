@@ -89,7 +89,8 @@ class MetadataReader:
             raw_exif=raw_exif,
         )
 
-    def _read_exif(self, file_path: Path) -> dict:
+    @staticmethod
+    def _read_exif(file_path: Path) -> dict:
         """
         Read raw EXIF data using exiftool.
 
@@ -107,7 +108,8 @@ class MetadataReader:
             logger.error(f'Failed to read EXIF from {file_path.name}: {e}')
             return {}
 
-    def _extract_creation_date(self, raw_exif: dict) -> datetime | None:
+    @staticmethod
+    def _extract_creation_date(raw_exif: dict) -> datetime | None:
         """
         Extract creation date from EXIF data.
 
@@ -152,7 +154,8 @@ class MetadataReader:
 
         return None
 
-    def _extract_gps_coordinates(self, raw_exif: dict) -> tuple[float, float, float]:
+    @staticmethod
+    def _extract_gps_coordinates(raw_exif: dict) -> tuple[float, float, float]:
         """
         Extract GPS coordinates from EXIF data.
 
@@ -186,7 +189,8 @@ class MetadataReader:
 
         return self.timezone_finder.timezone_at(lng=longitude, lat=latitude)
 
-    def _parse_date_from_filename(self, file_path: Path) -> datetime | None:
+    @staticmethod
+    def _parse_date_from_filename(file_path: Path) -> datetime | None:
         """
         Parse date from filename if present.
 
@@ -210,8 +214,9 @@ class MetadataReader:
 
         return None
 
+    @staticmethod
     def _determine_time_offset(
-        self, timezone: str | None, creation_date: datetime | None, parsed_filename_date: datetime | None
+        timezone: str | None, creation_date: datetime | None, parsed_filename_date: datetime | None
     ) -> int | None:
         """
         Determine timezone offset in hours.
@@ -248,7 +253,8 @@ class MetadataReader:
 
         return None
 
-    def _find_exiftool(self) -> str:
+    @staticmethod
+    def _find_exiftool() -> str:
         """
         Locate exiftool binary.
 

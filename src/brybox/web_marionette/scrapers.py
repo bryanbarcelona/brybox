@@ -4,6 +4,12 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from playwright.sync_api import (
+    Browser,
+    BrowserContext,
+    Locator,
+    Page,
+    Playwright,
+    Request,
     TimeoutError as PlaywrightTimeoutError,
     sync_playwright,
 )
@@ -37,12 +43,13 @@ class BaseScraper(ABC):
         Each scraper implements its specific logic.
         """
 
-    def _create_browser_context(self, playwright, **context_kwargs):
+    def _create_browser_context(self, playwright: Playwright, **context_kwargs: dict) -> tuple[Browser, BrowserContext]:
         """Create and configure browser context with common settings."""
         browser = playwright.chromium.launch(headless=self.headless)
         return browser, browser.new_context(**context_kwargs)
 
-    def _failure_result(self, error_msg: str, total_found: int = 0) -> DownloadResult:
+    @staticmethod
+    def _failure_result(error_msg: str, total_found: int = 0) -> DownloadResult:
         """Construct a failure result with consistent logging."""
         log_and_display(error_msg, level='error', log=True, sticky=False)
         return DownloadResult(
@@ -53,7 +60,8 @@ class BaseScraper(ABC):
             errors=[error_msg],
         )
 
-    def _build_result(self, total_found: int, downloaded: int, errors: list[str] | None = None) -> DownloadResult:
+    @staticmethod
+    def _build_result(total_found: int, downloaded: int, errors: list[str] | None = None) -> DownloadResult:
         """Construct result from operation statistics."""
         if errors is None:
             errors = []
@@ -128,7 +136,8 @@ class TechemScraper(BaseScraper):
         except Exception as e:
             return self._failure_result(f'Unexpected error: {e!s}')
 
-    def _handle_cookie_banner(self, page):
+    @staticmethod
+    def _handle_cookie_banner(page: Page) -> None:
         """Attempt to dismiss cookie banner if present."""
         try:
             cookie_button = page.get_by_role('button', name='Use necessary cookies only')
@@ -138,7 +147,7 @@ class TechemScraper(BaseScraper):
         except PlaywrightTimeoutError:
             log_and_display('Cookie banner not visible, skipping', log=False, sticky=False)
 
-    def _login(self, page):
+    def _login(self, page: Page) -> None:
         """Execute login sequence."""
         login_button = page.get_by_role('button', name='Login').first
         login_button.wait_for(state='visible', timeout=10000)
@@ -149,7 +158,8 @@ class TechemScraper(BaseScraper):
         page.fill('#password', self.password)
         page.click('#next')
 
-    def _download_pdf(self, page, output_path: Path):
+    @staticmethod
+    def _download_pdf(page: Page, output_path: Path) -> None:
         """Download the PDF invoice."""
         # Try multiple possible button names
         pdf_button = page.get_by_role('button', name='PDF herunterladen').or_(
@@ -193,7 +203,7 @@ class KfwScraper(BaseScraper):
         except Exception as e:
             return self._failure_result(f'Unexpected error: {e!s}')
 
-    def _execute_download_workflow(self, page, context) -> DownloadResult:
+    def _execute_download_workflow(self, page: Page, context: BrowserContext) -> DownloadResult:
         """Execute the full download workflow."""
         errors = []
 
@@ -215,7 +225,7 @@ class KfwScraper(BaseScraper):
         # Download all documents
         return self._download_all_documents(page, context, download_buttons)
 
-    def _attempt_login(self, page) -> DownloadResult | None:
+    def _attempt_login(self, page: Page) -> DownloadResult | None:
         """Attempt login. Returns failure result if unsuccessful, None if successful."""
         try:
             self._login(page)
@@ -223,7 +233,7 @@ class KfwScraper(BaseScraper):
         except PlaywrightTimeoutError:
             return self._failure_result('Login failed - check credentials or site availability')
 
-    def _attempt_navigation(self, page) -> DownloadResult | None:
+    def _attempt_navigation(self, page: Page) -> DownloadResult | None:
         """Attempt navigation to postbox. Returns failure result if unsuccessful, None if successful."""
         try:
             page.goto(self.POSTBOX_URL)
@@ -231,7 +241,9 @@ class KfwScraper(BaseScraper):
         except PlaywrightTimeoutError:
             return self._failure_result('Failed to access document inbox')
 
-    def _download_all_documents(self, page, context, download_buttons) -> DownloadResult:
+    def _download_all_documents(
+        self, page: Page, context: BrowserContext, download_buttons: list[Locator]
+    ) -> DownloadResult:
         """Download all documents with retry logic."""
         errors = []
         success_count = 0
@@ -268,7 +280,7 @@ class KfwScraper(BaseScraper):
 
         return self._build_result(total_documents, success_count, errors)
 
-    def _login(self, page):
+    def _login(self, page: Page) -> None:
         """Execute KFW login sequence."""
         page.goto(self.SITE_URL)
 
@@ -278,7 +290,9 @@ class KfwScraper(BaseScraper):
 
         page.wait_for_load_state('networkidle')
 
-    def _download_single_document(self, page, context, download_button, doc_index: int) -> bool:
+    def _download_single_document(
+        self, page: Page, context: BrowserContext, download_button: Locator, doc_index: int
+    ) -> bool:
         """
         Download a single document using request interception.
         Returns True if successful, False otherwise.
@@ -321,14 +335,16 @@ class KfwScraper(BaseScraper):
         log_and_display(f'Downloaded: {filename} ({len(response.body())} bytes)', log=True, sticky=False)
         return True
 
-    def _capture_download_request(self, context, download_button, page):
+    def _capture_download_request(
+        self, context: BrowserContext, download_button: Locator, page: Page
+    ) -> Request | None:
         """
         Click button and capture the resulting POST request.
         Returns the captured request or None if timeout.
         """
         captured_request = [None]
 
-        def capture_request(request):
+        def capture_request(request: Request) -> None:
             if 'KfwFormularServer' in request.url and request.method == 'POST':
                 captured_request[0] = request
 

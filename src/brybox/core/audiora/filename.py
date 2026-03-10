@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 
-class _FilenameProcessor:
+class FilenameProcessor:
     """Handles filename pattern matching and cleanup operations."""
 
     def __init__(self, config: dict[str, Any]):
@@ -89,7 +89,8 @@ class _FilenameProcessor:
 
         return session_name
 
-    def _clean_whitespace(self, text: str) -> str:
+    @staticmethod
+    def _clean_whitespace(text: str) -> str:
         """
         Clean up excessive whitespace in text.
 

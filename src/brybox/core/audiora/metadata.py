@@ -12,7 +12,7 @@ from exiftool.exceptions import ExifToolExecuteError
 from brybox.utils.logging import log_and_display
 
 
-class _AudioMetadataExtractor:
+class AudioMetadataExtractor:
     """Extracts metadata from audio files using exiftool."""
 
     def __init__(self):
@@ -53,7 +53,8 @@ class _AudioMetadataExtractor:
             log_and_display(f'Failed to read metadata from {Path(file_path).name}: {e}', level='error')
             return None
 
-    def _parse_quicktime_date(self, date_str: str) -> datetime | None:
+    @staticmethod
+    def _parse_quicktime_date(date_str: str) -> datetime | None:
         """
         Parse QuickTime date string to datetime object.
 
@@ -72,7 +73,8 @@ class _AudioMetadataExtractor:
             log_and_display(f'Failed to parse date: {date_str}', level='warning')
             return None
 
-    def extract_filename_date(self, filename: str) -> str | None:
+    @staticmethod
+    def extract_filename_date(filename: str) -> str | None:
         """
         Extract date from filename if present.
 
@@ -86,7 +88,7 @@ class _AudioMetadataExtractor:
         Returns:
             Date string in YYYYMMDD format, or None if not found
         """
-        # Pattern: MM-DD-YYYY or DD-MM-YYYY
+        # MM-DD-YYYY or DD-MM-YYYY
         pattern1 = r'^(\d{2})-(\d{2})-(\d{4})'
         match = re.search(pattern1, filename)
         if match:
@@ -98,7 +100,7 @@ class _AudioMetadataExtractor:
             except ValueError:
                 pass
 
-        # Pattern: YYYY-MM-DD
+        # YYYY-MM-DD
         pattern2 = r'^(\d{4})-(\d{2})-(\d{2})'
         match = re.search(pattern2, filename)
         if match:
@@ -111,7 +113,8 @@ class _AudioMetadataExtractor:
 
         return None
 
-    def validate_dates(self, metadata_date: str | None, filename_date: str | None, filename: str) -> str | None:
+    @staticmethod
+    def validate_dates(metadata_date: str | None, filename_date: str | None, filename: str) -> str | None:
         """
         Validate metadata date against filename date.
 

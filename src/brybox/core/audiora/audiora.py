@@ -8,21 +8,13 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from brybox.core.audiora.file_ops import _FileMover
-from brybox.core.audiora.filename import _FilenameProcessor
-from brybox.core.audiora.metadata import _AudioMetadataExtractor
+from brybox.core.audiora.file_ops import FileMover
+from brybox.core.audiora.filename import FilenameProcessor
+from brybox.core.audiora.metadata import AudioMetadataExtractor
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
 from brybox.utils.settings import BryboxSettings
 
 logger = get_configured_logger('Audiora')
-
-
-# def _load_audiora_config(config_path: str | None = None, config: dict | None = None) -> dict[str, Any]:
-#     """Return merged audiora JSON configs."""
-#     if config is not None:
-#         return config
-#     config_path = config_path or 'configs'
-#     return _ConfigLoader.load_configs(config_path=config_path, config_files={'categories': 'audiora_rules.json'})
 
 
 @dataclass
@@ -48,7 +40,6 @@ class AudioraCore:
         self,
         audio_filepath: str,
         base_dir: str | None = None,
-        config_path: str | None = None,
         config: dict | None = None,
         dry_run: bool = False,
     ) -> None:
@@ -66,7 +57,6 @@ class AudioraCore:
         self.dry_run = dry_run
 
         # Load configuration
-        # self.config = _load_audiora_config(config_path, config)
         self.config = config or BryboxSettings().audiora
 
         # Determine base directory
@@ -78,9 +68,9 @@ class AudioraCore:
             self.base_dir = str(Path.home() / 'AudioFiles')
 
         # Initialize processors
-        self.metadata_extractor = _AudioMetadataExtractor()
-        self.filename_processor = _FilenameProcessor(self.config)
-        self.file_mover = _FileMover(self.base_dir, dry_run)
+        self.metadata_extractor = AudioMetadataExtractor()
+        self.filename_processor = FilenameProcessor(self.config)
+        self.file_mover = FileMover(self.base_dir, dry_run)
 
     def process(self) -> _ProcessingContext:
         """
@@ -168,7 +158,6 @@ class AudioraNexus:
         self,
         dir_path: str,
         base_dir: str | None = None,
-        config_path: str | None = None,
         config: dict | None = None,
         dry_run: bool = False,
         processor_class: type[AudioraCore] = AudioraCore,
@@ -190,7 +179,6 @@ class AudioraNexus:
         self.processor_class = processor_class
 
         # Load config once for all files
-        # self.config = _load_audiora_config(config_path, config)
         self.config = config or BryboxSettings().audiora
 
     def process_all(self, progress_bar: bool = True, file_extensions: list[str] | None = None) -> dict[str, bool]:

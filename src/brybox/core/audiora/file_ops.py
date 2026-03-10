@@ -14,7 +14,7 @@ from brybox.events.bus import publish_file_deleted, publish_file_moved
 from brybox.utils.logging import log_and_display
 
 
-class _FileMover:
+class FileMover:
     """Handles file operations and path management."""
 
     def __init__(self, base_dir: str, dry_run: bool = False) -> None:
@@ -64,7 +64,8 @@ class _FileMover:
         # Handle filename conflicts
         return self._resolve_filename_conflict(filepath)
 
-    def _files_have_same_content(self, file1: str, file2: str) -> bool:
+    @staticmethod
+    def _files_have_same_content(file1: str, file2: str) -> bool:
         """
         Check if two audio files have the same content via metadata comparison.
 
@@ -95,7 +96,8 @@ class _FileMover:
         except (ExifToolExecuteError, Exception):
             return False
 
-    def _resolve_filename_conflict(self, filepath: str) -> str:
+    @staticmethod
+    def _resolve_filename_conflict(filepath: str) -> str:
         """
         Resolve filename conflicts by adding number suffix.
 
@@ -162,7 +164,8 @@ class _FileMover:
             publish_file_moved(source, destination, file_size, True)
             return True, True
 
-    def _is_healthy(self, filepath: str) -> bool:
+    @staticmethod
+    def _is_healthy(filepath: str) -> bool:
         """
         Verify audio file health using exiftool.
 
