@@ -13,7 +13,7 @@ from brybox.utils.health_check import is_healthy
 from brybox.utils.logging import log_and_display
 
 if TYPE_CHECKING:
-    from brybox.core.porter._shared.protocols import FileFilter
+    from brybox.core.porter.shared.protocols import FileFilter
 
 
 def _is_valid_image(file_path: Path) -> bool:
@@ -58,7 +58,7 @@ def _generate_temp_name(original_path: Path) -> Path:
     return Path(f'IMG_{timestamp}{rand_suffix}{ext}')
 
 
-def _stage_files_to_target(
+def stage_files_to_target(
     source: Path, target: Path, file_filter: FileFilter, migrate_sidecars: bool, dry_run: bool, action_prefix: str
 ) -> list[tuple[Path, Path, list[Path]]]:
     """

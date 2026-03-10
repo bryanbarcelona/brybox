@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from brybox.core.porter._shared.protocols import Deduplicator, PorterResult
+from brybox.core.porter.shared.protocols import Deduplicator, PorterResult
 from brybox.events.bus import publish_file_deleted
 from brybox.utils.apple_files import AppleSidecarManager
 from brybox.utils.logging import log_and_display
 
 
-def _remove_duplicates(
+def remove_duplicates(
     mappings: list[tuple[Path, Path, list[Path]]],
     deduplicator: Deduplicator,
     dry_run: bool,

@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from brybox.core.porter._shared.deduplication import _remove_duplicates
-from brybox.core.porter._shared.processing import _process_and_cleanup
-from brybox.core.porter._shared.protocols import Deduplicator, FileFilter, FileProcessor, MetadataFixer, PorterResult
-from brybox.core.porter._shared.staging import _stage_files_to_target
+from brybox.core.porter.shared.deduplication import remove_duplicates
+from brybox.core.porter.shared.processing import process_and_cleanup
+from brybox.core.porter.shared.protocols import Deduplicator, FileFilter, FileProcessor, MetadataFixer, PorterResult
+from brybox.core.porter.shared.staging import stage_files_to_target
 from brybox.utils.logging import get_configured_logger, log_and_display
 
 logger = get_configured_logger('Porter')
@@ -69,11 +69,11 @@ def run_porter_pipeline(
     result = PorterResult()
 
     # Phase 1: Stage files with temp names
-    mappings = _stage_files_to_target(source, target, file_filter, migrate_sidecars, dry_run, action_prefix)
+    mappings = stage_files_to_target(source, target, file_filter, migrate_sidecars, dry_run, action_prefix)
 
     # Phase 2a: Deduplication (if enabled)
     if deduplicator:
-        mappings = _remove_duplicates(mappings, deduplicator, dry_run, action_prefix, result)
+        mappings = remove_duplicates(mappings, deduplicator, dry_run, action_prefix, result)
 
     # Phase 2b: Metadata fixes (if enabled)
     if metadata_fixer:
@@ -81,7 +81,7 @@ def run_porter_pipeline(
 
     # Phase 3: Process and cleanup (if processor provided)
     if processor_class:
-        _process_and_cleanup(mappings, processor_class, dry_run, action_prefix, result)
+        process_and_cleanup(mappings, processor_class, dry_run, action_prefix, result)
     else:
         log_and_display(f'{action_prefix} No processor provided, files remain staged with temp names', log=False)
 

@@ -3,26 +3,17 @@
 from pathlib import Path
 from typing import Any
 
-from brybox.core.porter._shared.file_filters import ImageFileFilter
-from brybox.core.porter._shared.metadata_fixers import ExifTimestampFixer
-from brybox.core.porter._shared.orchestration import run_porter_pipeline
-from brybox.core.porter._shared.protocols import PorterResult
+from brybox.core.porter.shared.file_filters import ImageFileFilter
+from brybox.core.porter.shared.metadata_fixers import ExifTimestampFixer
+from brybox.core.porter.shared.orchestration import run_porter_pipeline
+from brybox.core.porter.shared.protocols import PorterResult
 from brybox.utils.logging import get_configured_logger
 from brybox.utils.settings import BryboxSettings
 
 logger = get_configured_logger('PixelPorter')
 
 
-# def _load_pixelporter_config(config_path: str | None = None, config: dict | None = None) -> dict[str, Any]:
-#     """Load PixelPorter configuration."""
-#     if config is not None:
-#         return config
-
-#     config_path = config_path or 'configs'
-#     return ConfigLoader.load_configs(config_path=config_path, config_files={'paths': 'pixelporter_paths.json'})
-
-
-def _get_default_processor():
+def _get_default_processor() -> type | None:
     """Lazy-load SnapJedi as default processor."""
     try:
         from brybox.core.snap_jedi import SnapJedi  # noqa: PLC0415
@@ -33,7 +24,7 @@ def _get_default_processor():
         return None
 
 
-def _get_default_deduplicator():
+def _get_default_deduplicator() -> Any | None:
     """Lazy-load HashDeduplicator as default."""
     try:
         from brybox.utils.deduplicator import HashDeduplicator  # noqa: PLC0415
@@ -47,7 +38,6 @@ def _get_default_deduplicator():
 def push_photos(
     source: Path | None = None,
     target: Path | None = None,
-    config_path: str | None = None,
     config: dict | None = None,
     processor_class: type | bool | None = None,
     deduplicator: Any | bool | None = None,
@@ -85,7 +75,6 @@ def push_photos(
     """
     # Load config if paths not provided
     if source is None or target is None:
-        # loaded_config = _load_pixelporter_config(config_path, config)
         loaded_config = config or BryboxSettings().pixelporter
         paths = loaded_config.get('paths', {})
         source = source or paths.get('source_folder')

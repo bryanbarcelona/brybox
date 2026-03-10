@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from brybox.core.porter._shared.protocols import FileProcessor, PorterResult
 from brybox.core.porter.models.image import ProcessResult
+from brybox.core.porter.shared.protocols import FileProcessor, PorterResult
 from brybox.events.bus import publish_file_renamed
 from brybox.utils.apple_files import AppleSidecarManager
 from brybox.utils.logging import log_and_display
 
 
-def _process_and_cleanup(
+def process_and_cleanup(
     mappings: list[tuple[Path, Path, list[Path]]],
     processor_class: type[FileProcessor],
     dry_run: bool,
