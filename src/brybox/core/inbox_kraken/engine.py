@@ -19,6 +19,11 @@ from brybox.core.inbox_kraken.handlers import (
     techem_handler,
 )
 from brybox.core.models.email import ProcessingContext
+from brybox.exceptions.emails import (
+    InboxKrakenConfigurationError,
+    InboxKrakenError,
+    InboxKrakenNetworkError,
+)
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
 from brybox.utils.settings import BryboxSettings
 
@@ -89,8 +94,14 @@ class InboxKraken:
 
     def run(self, mailbox: str = 'INBOX', limit: int | None = None, only_uids: list[int] | None = None) -> None:
         """Standard entry point for processing the inbox."""
-        # This will only fetch the list of IDs (Fast)
-        uids = self.fetcher.fetch_uids(mailbox=mailbox, limit=limit, only_uids=only_uids)
+        try:
+            uids = self.fetcher.fetch_uids(mailbox=mailbox, limit=limit, only_uids=only_uids)
+        except InboxKrakenConfigurationError as e:
+            log_and_display(f'CRITICAL CONFIG ERROR: {e}. Stopping Kraken.', level='ERROR')
+            return
+        except InboxKrakenNetworkError as e:
+            log_and_display(f'NETWORK ERROR: {e}. Will retry next session.', level='ERROR')
+            return
 
         if not uids:
             log_and_display('No emails found to process.')
@@ -99,8 +110,13 @@ class InboxKraken:
         for uid in trackerator(uids, description='Kraken Processing'):
             try:
                 self._process_single_email(uid)
+            except InboxKrakenError as e:
+                # Soft failure: This specific email failed, but the loop continues.
+                # No _cleanup_email is called because the Exception bypassed it.
+                log_and_display(f'⚠️ UID {uid} processing skipped: {e.message}', level='WARNING')
             except Exception as e:  # noqa: BLE001
-                log_and_display(f'Failed to process UID {uid}: {e}', level='ERROR')
+                # Harder failure: Unexpected bug. We still continue to next UID but log as ERROR.
+                log_and_display(f'❌ Unexpected error on UID {uid}: {e}', level='ERROR')
 
     def _process_single_email(self, uid: int) -> None:
         # A. LIGHT FETCH

@@ -5,6 +5,13 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
+from brybox.exceptions.emails import (
+    InboxKrakenConfigurationError,
+    InboxKrakenNetworkError,
+    InboxKrakenResourceNotFoundError,
+    InboxKrakenTimeoutError,
+)
+
 # --- CONFIG / CONSTANTS ---
 RESERVED_NAMES = {
     'con',
@@ -44,8 +51,12 @@ def resolve_redirected_url(url: str) -> str:
         # HEAD is often ignored by trackers; GET with stream=True is the reliable way.
         with requests.get(url, allow_redirects=True, timeout=10, stream=True) as r:
             return r.url
-    except requests.RequestException:
-        return url
+    except requests.Timeout as e:
+        raise InboxKrakenTimeoutError(f'Redirection check timed out for {url}', resource_path=url) from e
+    except requests.RequestException as e:
+        raise InboxKrakenNetworkError(
+            f'Failed to connect to resolution server for {url}', resource_path=url, error_detail=str(e)
+        ) from e
 
 
 def get_dropbox_download_link(url: str) -> str:
@@ -65,19 +76,20 @@ def get_dropbox_download_link(url: str) -> str:
 
 def classify_link(url: str) -> str:
     """
-    Determines if a link is a PDF or Dropbox Audio.
-    Leverages resolve_redirected_url to see past tracking masks.
+    Determines link type.
+    NO try/except here. Let resolution and request errors bubble.
     """
+    # 1. Resolve (This will now raise Timeout/NetworkError if it fails)
+    resolved_url = resolve_redirected_url(url)
+    resolved_lower = resolved_url.lower()
+
+    audio_exts = {'.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'}
+
+    # 2. Peek headers
     try:
-        # Step 1: Get the real destination
-        resolved_url = resolve_redirected_url(url)
-        resolved_lower = resolved_url.lower()
-
-        # Step 2: Quick check for direct extensions in URL
-        audio_exts = {'.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'}
-
-        # Step 3: Peek at headers via a stream request
         with requests.get(resolved_url, allow_redirects=True, timeout=10, stream=True) as r:
+            # We still don't use raise_for_status() because we want to see headers
+            # even on some 'failed' pages, but we catch connection issues.
             ctype = r.headers.get('Content-Type', '').lower()
             disp = r.headers.get('Content-Disposition', '').lower()
 
@@ -89,10 +101,14 @@ def classify_link(url: str) -> str:
             ):
                 return 'AUDIO'
 
-    except requests.RequestException:
-        return 'Error'
-    else:
-        return 'HTML page'
+            return 'HTML page'
+
+    except requests.Timeout as e:
+        raise InboxKrakenTimeoutError(f'Classification timeout for {resolved_url}', resource_path=resolved_url) from e
+    except requests.RequestException as e:
+        raise InboxKrakenNetworkError(
+            f'Classification network failure for {resolved_url}', resource_path=resolved_url, error_detail=str(e)
+        ) from e
 
 
 # --- 3. HTML PARSING HELPERS ---
@@ -128,10 +144,16 @@ def safe_filename(s: str) -> str:
 
 
 def save_path(base_name: str, save_dir: str | Path) -> Path:
-    """FIXED: Now returns a Path object instead of a string."""
+    """Returns a Path object instead of a string."""
     if not save_dir:
-        raise ValueError('save_dir required')
-    return Path(save_dir) / safe_filename(base_name)
+        raise InboxKrakenConfigurationError('Save directory not provided', config_key='save_dir')
+
+    path = Path(save_dir)
+    if not path.exists():
+        raise InboxKrakenResourceNotFoundError(f'Target save directory missing: {save_dir}', resource_path=save_dir)
+
+    # safe_filename call remains same
+    return path / safe_filename(base_name)
 
 
 def decode_mime_words(s: str) -> str:

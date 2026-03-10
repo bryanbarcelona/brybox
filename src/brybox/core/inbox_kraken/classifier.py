@@ -46,29 +46,26 @@ class EmailClassifier:
         """
         Checks all conditions. All present conditions must be True (AND logic).
         """
-        # 1. Smart Sender Match (Regex support)
-        if 'sender' in rule:
-            if not self._smart_match(rule['sender'], meta.sender):
-                return False
+        # 1. Smart Sender Match
+        if 'sender' in rule and not self._smart_match(rule['sender'], meta.sender):
+            return False
 
-        # 2. Smart Subject Match (Regex support)
-        if 'subject' in rule:
-            if not self._smart_match(rule['subject'], meta.subject):
-                return False
+        # 2. Smart Subject Match
+        if 'subject' in rule and not self._smart_match(rule['subject'], meta.subject):
+            return False
 
         # 3. PDF Attachment Requirement
-        if rule.get('has_pdf_attachment'):
-            if not any(a.lower().endswith('.pdf') for a in meta.attachments):
-                return False
+        if rule.get('has_pdf_attachment') and not any(a.lower().endswith('.pdf') for a in meta.attachments):
+            return False
 
-        # 4. Embedded Link Strictness (Only match if it's a direct PDF)
+        # 4. Embedded Link Strictness
         if rule.get('embedded_link'):
-            if not (meta.invoice_link and classify_link(meta.invoice_link) == 'PDF'):
-                return False
+            return bool(meta.invoice_link and classify_link(meta.invoice_link) == 'PDF')
 
         return True
 
-    def _smart_match(self, pattern: str, text: str) -> bool:
+    @staticmethod
+    def _smart_match(pattern: str, text: str) -> bool:
         """
         Attempts a regex match. If pattern is not valid regex or no match,
         falls back to a simple case-insensitive substring check.
@@ -94,9 +91,7 @@ class EmailClassifier:
 
     def is_candidate(self, meta: EmailMeta) -> bool:
         """
-        Kicks out any email whose sender isn't explicitly in our JSON rules.
+        Kicks out any email whose sender isn't explicitly in the JSON rules.
         """
-        for rule in self.rules:
-            if 'sender' in rule and self._smart_match(rule['sender'], meta.sender):
-                return True
-        return False
+
+        return any('sender' in rule and self._smart_match(rule['sender'], meta.sender) for rule in self.rules)
