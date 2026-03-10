@@ -3,7 +3,7 @@ import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from brybox.utils.logging import get_configured_logger
+from brybox.utils.logging import get_configured_logger, log_and_display
 
 logger = get_configured_logger('VideoConverter')
 
@@ -106,11 +106,11 @@ class FFmpegConverter(VideoConverter):
             )
 
             if result.returncode == 0:
-                logger.info(f'Converted {source.name} using stream copy')
+                log_and_display(f'Converted {source.name} using stream copy')
                 return
 
             # Primary failed, clean up and try fallback
-            logger.warning(f'Stream copy failed for {source.name}, re-encoding...')
+            log_and_display(f'Stream copy failed for {source.name}, re-encoding...', level='warning')
 
             if target.exists():
                 target.unlink()
@@ -124,7 +124,7 @@ class FFmpegConverter(VideoConverter):
             )
 
             if fallback_result.returncode == 0:
-                logger.info(f'Converted {source.name} using re-encoding')
+                log_and_display(f'Converted {source.name} using re-encoding')
                 return
 
             raise ConversionError('Both stream copy and re-encoding failed')

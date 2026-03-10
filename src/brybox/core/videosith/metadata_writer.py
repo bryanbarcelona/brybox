@@ -3,7 +3,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from brybox.utils.logging import get_configured_logger
+from brybox.utils.logging import get_configured_logger, log_and_display
 
 logger = get_configured_logger('VideoMetadataWriter')
 
@@ -74,7 +74,7 @@ class MetadataWriter:
             )
 
             if result.returncode == 0:
-                logger.info(f'Set creation date on {file_path.name}')
+                log_and_display(f'Set creation date on {file_path.name}')
             else:
                 raise MetadataWriteError(f'ExifTool returned error code: {result.returncode}')
 
@@ -98,7 +98,7 @@ class MetadataWriter:
         """
         # Skip if coordinates are all zeros (invalid)
         if latitude == 0 and longitude == 0 and altitude == 0:
-            logger.debug(f'Skipping GPS write for {file_path.name} (no valid coords)')
+            log_and_display(f'Skipping GPS write for {file_path.name} (no valid coords)')
             return
 
         # Build GPS parameter
@@ -113,7 +113,7 @@ class MetadataWriter:
             )
 
             if result.returncode == 0:
-                logger.info(f'Set GPS coordinates on {file_path.name}')
+                log_and_display(f'Set GPS coordinates on {file_path.name}')
             else:
                 raise MetadataWriteError(f'ExifTool returned error code: {result.returncode}')
 

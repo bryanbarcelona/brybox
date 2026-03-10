@@ -9,7 +9,7 @@ import pytz
 from exiftool.exceptions import ExifToolExecuteError
 from timezonefinder import TimezoneFinder
 
-from brybox.utils.logging import get_configured_logger
+from brybox.utils.logging import get_configured_logger, log_and_display
 
 logger = get_configured_logger('VideoMetadata')
 
@@ -105,7 +105,7 @@ class MetadataReader:
                 metadata = et.get_metadata(str(file_path))[0]
                 return metadata
         except ExifToolExecuteError as e:
-            logger.error(f'Failed to read EXIF from {file_path.name}: {e}')
+            log_and_display(f'Failed to read EXIF from {file_path.name}: {e}', level='error')
             return {}
 
     @staticmethod

@@ -40,6 +40,7 @@ def push_videos(
     config: dict | None = None,
     processor_class: type | bool | None = None,
     deduplicator: Any | bool | None = None,
+    *,
     migrate_sidecars: bool = True,
     dry_run: bool = False,
 ) -> PorterResult:

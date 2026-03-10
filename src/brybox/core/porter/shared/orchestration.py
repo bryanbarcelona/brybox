@@ -18,6 +18,7 @@ def run_porter_pipeline(
     processor_class: type[FileProcessor] | None,
     deduplicator: Deduplicator | None = None,
     metadata_fixer: MetadataFixer | None = None,
+    *,
     migrate_sidecars: bool = True,
     dry_run: bool = False,
 ) -> PorterResult:

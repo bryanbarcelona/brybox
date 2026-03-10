@@ -1,7 +1,6 @@
 import datetime
 import logging
-import os
-import pathlib
+from pathlib import Path
 
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -11,11 +10,11 @@ def configure_logging() -> tuple | None:
 
     # Create Logs directory if it doesn't exist
     logs_dir = 'logs'
-    if not pathlib.Path(logs_dir).exists():
-        pathlib.Path(logs_dir).mkdir(parents=True)
+    if not Path(logs_dir).exists():
+        Path(logs_dir).mkdir(parents=True)
         print(f'Created directory: {logs_dir}')
 
-    log_filepath = os.path.join(logs_dir, f'{timestamp}_brybox.log')
+    log_filepath = Path(logs_dir) / f'{timestamp}_brybox.log'
 
     logging.basicConfig(
         level=logging.INFO,

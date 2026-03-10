@@ -3,8 +3,6 @@ Audiora audio classification and filing system.
 A sleek, futuristic audio processing system for organizing audio files.
 """
 
-import glob
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,6 +39,7 @@ class AudioraCore:
         audio_filepath: str,
         base_dir: str | None = None,
         config: dict | None = None,
+        *,
         dry_run: bool = False,
     ) -> None:
         """
@@ -70,7 +69,7 @@ class AudioraCore:
         # Initialize processors
         self.metadata_extractor = AudioMetadataExtractor()
         self.filename_processor = FilenameProcessor(self.config)
-        self.file_mover = FileMover(self.base_dir, dry_run)
+        self.file_mover = FileMover(self.base_dir, dry_run=dry_run)
 
     def process(self) -> _ProcessingContext:
         """
@@ -159,6 +158,7 @@ class AudioraNexus:
         dir_path: str,
         base_dir: str | None = None,
         config: dict | None = None,
+        *,
         dry_run: bool = False,
         processor_class: type[AudioraCore] = AudioraCore,
     ):
@@ -181,7 +181,7 @@ class AudioraNexus:
         # Load config once for all files
         self.config = config or BryboxSettings().audiora
 
-    def process_all(self, progress_bar: bool = True, file_extensions: list[str] | None = None) -> dict[str, bool]:
+    def process_all(self, *, progress_bar: bool = True, file_extensions: list[str] | None = None) -> dict[str, bool]:
         """
         Process all audio files in directory.
 
@@ -198,8 +198,7 @@ class AudioraNexus:
         # Gather all matching audio files
         audio_files = []
         for ext in file_extensions:
-            pattern = os.path.join(self.dir_path, f'*{ext}')
-            audio_files.extend(glob.glob(pattern))
+            audio_files.extend(Path(self.dir_path).glob(f'*{ext}'))
 
         results = {}
 

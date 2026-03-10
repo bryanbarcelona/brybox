@@ -30,7 +30,7 @@ class BaseScraper(ABC):
     Each concrete scraper implements its specific download logic.
     """
 
-    def __init__(self, username: str, password: str, download_dir: str | None = None, headless: bool = True):
+    def __init__(self, username: str, password: str, download_dir: str | None = None, *, headless: bool = True):
         self.username = username
         self.password = password
         self.download_dir = download_dir or str(Path.home() / 'Downloads')

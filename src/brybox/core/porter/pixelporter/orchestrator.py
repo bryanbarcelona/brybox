@@ -41,6 +41,7 @@ def push_photos(
     config: dict | None = None,
     processor_class: type | bool | None = None,
     deduplicator: Any | bool | None = None,
+    *,
     migrate_sidecars: bool = True,
     ensure_unique_timestamps: bool = True,
     dry_run: bool = False,

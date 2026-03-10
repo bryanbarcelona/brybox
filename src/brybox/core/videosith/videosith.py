@@ -6,7 +6,7 @@ from brybox.core.videosith.metadata import MetadataReader, VideoMetadata
 from brybox.core.videosith.metadata_writer import MetadataWriter
 from brybox.core.videosith.naming import PathStrategy
 from brybox.utils.apple_files import AppleSidecarManager
-from brybox.utils.logging import get_configured_logger
+from brybox.utils.logging import get_configured_logger, log_and_display
 
 logger = get_configured_logger('VideoSith')
 
@@ -86,18 +86,18 @@ class VideoSith:
             True if conversion successful, False otherwise
         """
         if self._file_path is None:
-            logger.error('Must call open() or set file path before conversion')
+            log_and_display('Must call open() or set file path before conversion', level='error')
             return False
 
         # Skip if already MP4
         if self._file_path.suffix.lower() == '.mp4':
-            logger.debug(f'{self._file_path.name} is already MP4, skipping conversion')
+            log_and_display(f'{self._file_path.name} is already MP4, skipping conversion')
             return True
 
         try:
             # Step 1: Extract metadata from source
             self._metadata = self._metadata_reader.extract_metadata(self._file_path)
-            logger.debug(f'Extracted metadata from {self._file_path.name}')
+            log_and_display(f'Extracted metadata from {self._file_path.name}')
 
             # Step 2: Generate target path
             target_path = PathStrategy.generate_target_path(
@@ -106,7 +106,7 @@ class VideoSith:
 
             # Step 3: Convert to MP4
             self._converter.convert_to_mp4(self._file_path, target_path)
-            logger.info(f'Converted {self._file_path.name} to {target_path.name}')
+            log_and_display(f'Converted {self._file_path.name} to {target_path.name}')
 
             # Step 4: Write metadata to new MP4
             self._write_metadata_to_file(target_path)
@@ -114,7 +114,7 @@ class VideoSith:
             # Step 5: Delete original MOV
             if self._file_path.exists():
                 self._file_path.unlink()
-                logger.info(f'Deleted original: {self._file_path.name}')
+                log_and_display(f'Deleted original: {self._file_path.name}')
 
             # Step 6: Clean up Apple sidecars
             self._sidecar_manager.delete_sidecars(self._file_path)
@@ -125,10 +125,10 @@ class VideoSith:
             return True
 
         except ConversionError as e:
-            logger.exception('Conversion failed: %s', e)  # Changed from .error to .exception
+            log_and_display(f'Conversion failed: {e}', level='error')
             return False
         except Exception:
-            logger.exception('Unexpected error during conversion')  # Removed exc_info=True
+            log_and_display('Unexpected error during conversion', level='error')
             return False
 
     def rename_mp4(self) -> None:
@@ -144,18 +144,18 @@ class VideoSith:
         6. Clean up Apple sidecars
         """
         if self._file_path is None:
-            logger.error('Must call open() or set file path before renaming')
+            log_and_display('Must call open() or set file path before renaming', level='error')
             return
 
         # Skip if not MP4
         if self._file_path.suffix.lower() != '.mp4':
-            logger.debug(f'{self._file_path.name} is not MP4, skipping rename')
+            log_and_display(f'{self._file_path.name} is not MP4, skipping rename')
             return
 
         try:
             # Step 1: Extract metadata
             self._metadata = self._metadata_reader.extract_metadata(self._file_path)
-            logger.debug(f'Extracted metadata from {self._file_path.name}')
+            log_and_display(f'Extracted metadata from {self._file_path.name}')
 
             # Step 2: Generate target path
             target_path = PathStrategy.generate_target_path(
@@ -165,10 +165,10 @@ class VideoSith:
             # Step 3: Rename if different
             if self._file_path != target_path:
                 self._file_path.rename(target_path)
-                logger.info(f'Renamed {self._file_path.name} to {target_path.name}')
+                log_and_display(f'Renamed {self._file_path.name} to {target_path.name}')
                 self._file_path = target_path
             else:
-                logger.debug(f'No rename needed for {self._file_path.name}')
+                log_and_display(f'No rename needed for {self._file_path.name}')
 
             # Step 4: Write metadata
             self._write_metadata_to_file(self._file_path)
@@ -177,7 +177,7 @@ class VideoSith:
             self._sidecar_manager.delete_sidecars(self._file_path)
 
         except Exception as e:
-            logger.error('Rename failed: %s', e, exc_info=True)
+            log_and_display(f'Rename failed: {e}', level='error')
 
     def _write_metadata_to_file(self, file_path: Path) -> None:
         """
@@ -187,7 +187,7 @@ class VideoSith:
             file_path: Path to video file
         """
         if self._metadata is None:
-            logger.warning('No metadata to write')
+            log_and_display('No metadata to write', level='warning')
             return
 
         # Write GPS coordinates if available
@@ -199,7 +199,7 @@ class VideoSith:
                     file_path, self._metadata.gps_latitude, self._metadata.gps_longitude, self._metadata.gps_altitude
                 )
             except Exception as e:
-                logger.warning('Failed to write GPS coordinates: %s', e)
+                log_and_display(f'Failed to write GPS coordinates: {e}', level='warning')
 
         # Write creation date if available
         if self._metadata.creation_date is not None:
@@ -208,7 +208,7 @@ class VideoSith:
                     file_path, self._metadata.creation_date, self._metadata.time_offset
                 )
             except Exception as e:
-                logger.warning('Failed to write creation date: %s', e)
+                log_and_display(f'Failed to write creation date: {e}', level='warning')
 
     @property
     def file_path(self) -> Path | None:
@@ -239,7 +239,7 @@ class VideoSith:
             raise ValueError(f'Not a file: {file_path}')
 
         self._file_path = file_path
-        logger.debug(f'Opened file: {file_path.name}')
+        log_and_display(f'Opened file: {file_path.name}')
 
 
 def main() -> None:

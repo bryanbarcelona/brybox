@@ -2,7 +2,6 @@
 File operations: moving, conflict resolution, and path management.
 """
 
-import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -17,7 +16,7 @@ from brybox.utils.logging import log_and_display
 class FileMover:
     """Handles file operations and path management."""
 
-    def __init__(self, base_dir: str, dry_run: bool = False) -> None:
+    def __init__(self, base_dir: str, *, dry_run: bool = False) -> None:
         """
         Initialize file mover.
 
@@ -49,7 +48,7 @@ class FileMover:
             return None
 
         relative_path = categories[category].get('output_path', '')
-        filepath = os.path.join(self.base_dir, relative_path, filename).replace('/', '\\')
+        filepath = Path(self.base_dir) / relative_path / filename
 
         if not Path(filepath).is_file():
             return filepath
@@ -65,7 +64,7 @@ class FileMover:
         return self._resolve_filename_conflict(filepath)
 
     @staticmethod
-    def _files_have_same_content(file1: str, file2: str) -> bool:
+    def _files_have_same_content(file1: str | Path, file2: str | Path) -> bool:
         """
         Check if two audio files have the same content via metadata comparison.
 
@@ -78,10 +77,12 @@ class FileMover:
         Returns:
             True if files appear to have same content, False otherwise
         """
+        file1 = str(file1)
+        file2 = str(file2)
         try:
             with exiftool.ExifToolHelper() as et:
-                meta1 = et.get_metadata(str(file1))[0]
-                meta2 = et.get_metadata(str(file2))[0]
+                meta1 = et.get_metadata(file1)[0]
+                meta2 = et.get_metadata(file2)[0]
 
                 # Compare key fields that indicate same content
                 comparison_fields = ['File:FileSize', 'QuickTime:Duration', 'QuickTime:MediaCreateDate']
@@ -97,7 +98,7 @@ class FileMover:
             return False
 
     @staticmethod
-    def _resolve_filename_conflict(filepath: str) -> str:
+    def _resolve_filename_conflict(filepath: str | Path) -> str:
         """
         Resolve filename conflicts by adding number suffix.
 
@@ -107,15 +108,15 @@ class FileMover:
         Returns:
             New filepath with (N) suffix
         """
+        filepath = Path(filepath)
         i = 1
-        base, ext = os.path.splitext(filepath)
 
-        while Path(f'{base}({i}){ext}').is_file():
+        while Path(f'{filepath.stem}({i}){filepath.suffix}').is_file():
             i += 1
 
-        return f'{base}({i}){ext}'
+        return f'{filepath.stem}({i}){filepath.suffix}'
 
-    def move_file(self, source: str, destination: str) -> tuple[bool, bool]:
+    def move_file(self, source: str | Path, destination: str | Path) -> tuple[bool, bool]:
         """
         Move file from source to destination.
 
@@ -128,16 +129,19 @@ class FileMover:
             - success: True if operation completed successfully
             - is_new_file: True if file was moved (new), False if duplicate deleted
         """
-        if not Path(source).exists():
+        source = Path(source)
+        destination = Path(destination)
+
+        if not source.exists():
             log_and_display(f'Source file does not exist: {source}', level='warning')
             return False, False
 
-        file_size = Path(source).stat().st_size
-        output_dir = os.path.dirname(destination)
+        file_size = source.stat().st_size
+        output_dir = destination.parent
 
         if self.dry_run:
             log_and_display(f'Would create directory: {output_dir}')
-            if Path(destination).exists():
+            if destination.exists():
                 log_and_display(f'Would delete source file (duplicate): {source}')
                 return True, False
             else:
@@ -145,12 +149,12 @@ class FileMover:
                 return True, True
 
         # Create directory if needed
-        if not Path(output_dir).exists():
-            Path(output_dir).mkdir(parents=True)
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True)
 
         # Handle existing destination
-        if Path(destination).exists() and self._is_healthy(destination):
-            Path(source).unlink()
+        if destination.exists() and self._is_healthy(destination):
+            source.unlink()
             log_and_display(f'Destination exists. Deleted source file: {source}')
             publish_file_deleted(source, file_size)
             return True, False
@@ -165,7 +169,7 @@ class FileMover:
             return True, True
 
     @staticmethod
-    def _is_healthy(filepath: str) -> bool:
+    def _is_healthy(filepath: str | Path) -> bool:
         """
         Verify audio file health using exiftool.
 

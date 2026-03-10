@@ -14,7 +14,7 @@ from brybox import (
     InboxKraken
 )
 from logging_config import configure_logging
-from test_env_resetter import testing_doctopus, testing_pixelporter, nuke_dir_content
+from test_env_resetter import testing_doctopus, testing_pixelporter, nuke_dir_content, testing_audiora
 
 logger = logging.getLogger('BryBox')
 
@@ -209,36 +209,28 @@ def test_audiora():
 
     configure_logging()
     enable_verbose_logging()
-
-    # logger.setLevel(logging.INFO)
-    # logger.info("Logging is configured.")
     log_and_display('Logging is configured.', sticky=True)
 
-    # # # Example 1: Single PDF processing
-    # # processor = DoctopusPrime2(
-    # #     pdf_filepath=r"D:\Testing PDFs\document_2_1132426471.pdf",
-    # #     base_dir=r"D:\Testing PDF Target",
-    # #     dry_run=False
-    # # )
+    log_and_display("🚀 Starting Audiora Smoke Test...")
 
-    # Process and move file
-    # success = processor.shuttle_service(include_backup=True)
-    # print(f"Processing success: {success}")
 
-    audio_source_dir = r'C:\Users\bryan\Downloads\Chuck McGee - Copy'
-    audio_target_dir = r'C:\Users\bryan\Downloads\Audio'
+    testing_audiora()
 
-    verifier = DirectoryVerifier(audio_source_dir, audio_target_dir)
-    # Example 2: Batch processing
+
+    AUDIO_SRC = r"D:\BryBoxTesting\AudioraTest\src"
+    AUDIO_DST = r"D:\BryBoxTesting\AudioraTest\dst"
+
+    verifier = DirectoryVerifier(AUDIO_SRC, AUDIO_DST)
+
     nexus_real = AudioraNexus(
-        dir_path=audio_source_dir, base_dir=audio_target_dir, config_path='configs', dry_run=False
+        dir_path=AUDIO_SRC,
+        base_dir=AUDIO_DST,
+        dry_run=False,
     )
     results_real = nexus_real.process_all(progress_bar=True)
 
     success = verifier.report()
     verifier.cleanup()
-
-    # fetch_and_process_emails()
 
     log_and_display('Finished all tasks.', sticky=True)
 
@@ -279,13 +271,13 @@ def test_doctopus():
 def full_run_test():
 
     SAMPLE_EMAIL_UIDS = [
-        43661, # delete
-        43512, # audio - Chuck
-        43674, # PDF link - Bolt
+        #43661, # delete
+        #43512, # audio - Chuck
+        #43674, # PDF link - Bolt
         43672, # Techem
         43560, # KfW
-        43634, # Stoklossa
-        43682, # ignore - Ticketmaster
+        #43634, # Stoklossa
+        #43682, # ignore - Ticketmaster
     ]
 
     BASE_DIR = Path(r"D:\BryBoxTesting\InboxKrakenTest")
@@ -343,9 +335,9 @@ def full_run_test():
 
 if __name__ == '__main__':
     # main()
-    test_pixelporter()
+    #test_pixelporter()
     # test_videosith()
-    # test_audiora()
+    #test_audiora()
     # test_inbox_kraken()
     #full_run_test()
-    #test_doctopus()
+    test_doctopus()
