@@ -7,13 +7,13 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ....events.bus import publish_file_copied
-from ....utils.apple_files import AppleSidecarManager
-from ....utils.health_check import is_healthy
-from ....utils.logging import log_and_display
+from brybox.events.bus import publish_file_copied
+from brybox.utils.apple_files import AppleSidecarManager
+from brybox.utils.health_check import is_healthy
+from brybox.utils.logging import log_and_display
 
 if TYPE_CHECKING:
-    from .protocols import FileFilter
+    from brybox.core.porter._shared.protocols import FileFilter
 
 
 def _is_valid_image(file_path: Path) -> bool:

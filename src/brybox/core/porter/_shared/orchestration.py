@@ -2,11 +2,11 @@
 
 from pathlib import Path
 
-from ....utils.logging import get_configured_logger, log_and_display
-from .deduplication import _remove_duplicates
-from .processing import _process_and_cleanup
-from .protocols import Deduplicator, FileFilter, FileProcessor, MetadataFixer, PorterResult
-from .staging import _stage_files_to_target
+from brybox.core.porter._shared.deduplication import _remove_duplicates
+from brybox.core.porter._shared.processing import _process_and_cleanup
+from brybox.core.porter._shared.protocols import Deduplicator, FileFilter, FileProcessor, MetadataFixer, PorterResult
+from brybox.core.porter._shared.staging import _stage_files_to_target
+from brybox.utils.logging import get_configured_logger, log_and_display
 
 logger = get_configured_logger('Porter')
 

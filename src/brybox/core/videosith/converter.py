@@ -3,7 +3,7 @@ import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from ...utils.logging import get_configured_logger
+from brybox.utils.logging import get_configured_logger
 
 logger = get_configured_logger('VideoConverter')
 

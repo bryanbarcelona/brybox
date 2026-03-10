@@ -8,10 +8,10 @@ from playwright.sync_api import (
     sync_playwright,
 )
 
-from ..events.bus import publish_file_added
-from ..utils.health_check import is_pdf_healthy
-from ..utils.logging import log_and_display
-from .models import DownloadResult
+from brybox.events.bus import publish_file_added
+from brybox.utils.health_check import is_pdf_healthy
+from brybox.utils.logging import log_and_display
+from brybox.web_marionette.models import DownloadResult
 
 logger = logging.getLogger('WebMarionette')
 

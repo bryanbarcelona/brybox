@@ -9,7 +9,7 @@ import pytz
 from exiftool.exceptions import ExifToolExecuteError
 from timezonefinder import TimezoneFinder
 
-from ...utils.logging import get_configured_logger
+from brybox.utils.logging import get_configured_logger
 
 logger = get_configured_logger('VideoMetadata')
 

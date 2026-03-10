@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ....events.bus import publish_file_renamed
-from ....utils.apple_files import AppleSidecarManager
-from ....utils.logging import log_and_display
-from ..models import ProcessResult
-from .protocols import FileProcessor, PorterResult
+from brybox.core.porter._shared.protocols import FileProcessor, PorterResult
+from brybox.core.porter.models.image import ProcessResult
+from brybox.events.bus import publish_file_renamed
+from brybox.utils.apple_files import AppleSidecarManager
+from brybox.utils.logging import log_and_display
 
 
 def _process_and_cleanup(

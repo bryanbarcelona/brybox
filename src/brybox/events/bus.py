@@ -9,7 +9,7 @@ from datetime import datetime
 from threading import Lock
 from typing import Any, TypeVar
 
-from .models import FileAddedEvent, FileCopiedEvent, FileDeletedEvent, FileMovedEvent, FileRenamedEvent
+from brybox.events.models import FileAddedEvent, FileCopiedEvent, FileDeletedEvent, FileMovedEvent, FileRenamedEvent
 
 # Type for event classes
 EventType = TypeVar('EventType')

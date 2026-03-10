@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from ..models import ProcessResult
+from brybox.core.porter.models.image import ProcessResult
 
 
 @dataclass

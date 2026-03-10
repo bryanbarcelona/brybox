@@ -3,12 +3,11 @@
 from pathlib import Path
 from typing import Any
 
+from brybox.core.porter._shared.file_filters import VideoFileFilter
+from brybox.core.porter._shared.orchestration import run_porter_pipeline
+from brybox.core.porter._shared.protocols import PorterResult
+from brybox.utils.logging import get_configured_logger
 from brybox.utils.settings import BryboxSettings
-
-from ....utils.logging import get_configured_logger
-from .._shared.file_filters import VideoFileFilter
-from .._shared.orchestration import run_porter_pipeline
-from .._shared.protocols import PorterResult
 
 logger = get_configured_logger('MotionPorter')
 
@@ -16,7 +15,7 @@ logger = get_configured_logger('MotionPorter')
 def _get_default_processor():
     """Lazy-load VideoSith as default processor."""
     try:
-        from ...videosith import VideoSith
+        from brybox.core.videosith import VideoSith  # noqa: PLC0415
 
         return VideoSith
     except ImportError:
@@ -27,7 +26,7 @@ def _get_default_processor():
 def _get_default_deduplicator():
     """Lazy-load HashDeduplicator as default."""
     try:
-        from ....utils.deduplicator import HashDeduplicator
+        from brybox.utils.deduplicator import HashDeduplicator  # noqa: PLC0415
 
         return HashDeduplicator()
     except ImportError:
@@ -40,8 +39,8 @@ def push_videos(
     target: Path | None = None,
     config_path: str | None = None,
     config: dict | None = None,
-    processor_class: type | None | bool = None,
-    deduplicator: Any | None | bool = None,
+    processor_class: type | bool | None = None,
+    deduplicator: Any | bool | None = None,
     migrate_sidecars: bool = True,
     dry_run: bool = False,
 ) -> PorterResult:

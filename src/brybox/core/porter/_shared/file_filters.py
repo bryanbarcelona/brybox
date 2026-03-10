@@ -10,7 +10,8 @@ class ImageFileFilter:
             return False
         return path.suffix.lower() in self.get_extensions()
 
-    def get_extensions(self) -> set[str]:
+    @staticmethod
+    def get_extensions() -> set[str]:
         return {'.jpg', '.jpeg', '.heic', '.heif', '.png'}
 
 
@@ -22,5 +23,6 @@ class VideoFileFilter:
             return False
         return path.suffix.lower() in self.get_extensions()
 
-    def get_extensions(self) -> set[str]:
+    @staticmethod
+    def get_extensions() -> set[str]:
         return {'.mov', '.mp4', '.3gp', '.3g2', '.m4v'}

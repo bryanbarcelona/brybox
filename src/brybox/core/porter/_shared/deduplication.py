@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ....events.bus import publish_file_deleted
-from ....utils.apple_files import AppleSidecarManager
-from ....utils.logging import log_and_display
-from .protocols import Deduplicator, PorterResult
+from brybox.core.porter._shared.protocols import Deduplicator, PorterResult
+from brybox.events.bus import publish_file_deleted
+from brybox.utils.apple_files import AppleSidecarManager
+from brybox.utils.logging import log_and_display
 
 
 def _remove_duplicates(

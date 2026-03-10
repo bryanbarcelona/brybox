@@ -6,9 +6,9 @@ Path-based verification using pub-sub events to track expected filesystem state.
 import os
 from pathlib import Path
 
-from ..utils.logging import get_configured_logger, log_and_display
-from .bus import event_bus
-from .models import FileAddedEvent, FileCopiedEvent, FileDeletedEvent, FileMovedEvent, FileRenamedEvent
+from brybox.events.bus import event_bus
+from brybox.events.models import FileAddedEvent, FileCopiedEvent, FileDeletedEvent, FileMovedEvent, FileRenamedEvent
+from brybox.utils.logging import get_configured_logger, log_and_display
 
 logger = get_configured_logger('DirectoryVerifier')
 

@@ -2,7 +2,7 @@ import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ....utils.logging import log_and_display
+from brybox.utils.logging import log_and_display
 
 
 class ExifTimestampFixer:

@@ -3,13 +3,11 @@
 from pathlib import Path
 from typing import Any
 
-from ....utils.config_loader import ConfigLoader
-from ....utils.logging import get_configured_logger
-from .._shared.file_filters import ImageFileFilter
-from .._shared.metadata_fixers import ExifTimestampFixer
-from .._shared.orchestration import run_porter_pipeline
-from .._shared.protocols import PorterResult
-
+from brybox.core.porter._shared.file_filters import ImageFileFilter
+from brybox.core.porter._shared.metadata_fixers import ExifTimestampFixer
+from brybox.core.porter._shared.orchestration import run_porter_pipeline
+from brybox.core.porter._shared.protocols import PorterResult
+from brybox.utils.logging import get_configured_logger
 from brybox.utils.settings import BryboxSettings
 
 logger = get_configured_logger('PixelPorter')
@@ -27,7 +25,7 @@ logger = get_configured_logger('PixelPorter')
 def _get_default_processor():
     """Lazy-load SnapJedi as default processor."""
     try:
-        from ...snap_jedi import SnapJedi
+        from brybox.core.snap_jedi import SnapJedi  # noqa: PLC0415
 
         return SnapJedi
     except ImportError:
@@ -38,7 +36,7 @@ def _get_default_processor():
 def _get_default_deduplicator():
     """Lazy-load HashDeduplicator as default."""
     try:
-        from ....utils.deduplicator import HashDeduplicator
+        from brybox.utils.deduplicator import HashDeduplicator  # noqa: PLC0415
 
         return HashDeduplicator()
     except ImportError:
@@ -51,8 +49,8 @@ def push_photos(
     target: Path | None = None,
     config_path: str | None = None,
     config: dict | None = None,
-    processor_class: type | None | bool = None,
-    deduplicator: Any | None | bool = None,
+    processor_class: type | bool | None = None,
+    deduplicator: Any | bool | None = None,
     migrate_sidecars: bool = True,
     ensure_unique_timestamps: bool = True,
     dry_run: bool = False,

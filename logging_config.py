@@ -6,7 +6,7 @@ import pathlib
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
 
-def configure_logging() -> None | tuple:
+def configure_logging() -> tuple | None:
     """Configures logging settings for the application."""
 
     # Create Logs directory if it doesn't exist
