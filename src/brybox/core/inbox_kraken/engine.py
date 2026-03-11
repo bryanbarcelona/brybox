@@ -111,11 +111,8 @@ class InboxKraken:
             try:
                 self._process_single_email(uid)
             except InboxKrakenError as e:
-                # Soft failure: This specific email failed, but the loop continues.
-                # No _cleanup_email is called because the Exception bypassed it.
-                log_and_display(f'⚠️ UID {uid} processing skipped: {e.message}', level='WARNING')
+                log_and_display(f'⚠️ UID {uid} processing skipped: {e}', level='WARNING')
             except Exception as e:  # noqa: BLE001
-                # Harder failure: Unexpected bug. We still continue to next UID but log as ERROR.
                 log_and_display(f'❌ Unexpected error on UID {uid}: {e}', level='ERROR')
 
     def _process_single_email(self, uid: int) -> None:

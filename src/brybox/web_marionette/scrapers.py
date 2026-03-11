@@ -15,6 +15,14 @@ from playwright.sync_api import (
 )
 
 from brybox.events.bus import publish_file_added
+from brybox.exceptions.scrapers import (
+    ScraperAuthenticationError,
+    ScraperConfigurationError,
+    ScraperDownloadError,
+    ScraperError,
+    ScraperHealthCheckError,
+    ScraperNavigationError,
+)
 from brybox.utils.health_check import is_pdf_healthy
 from brybox.utils.logging import log_and_display
 from brybox.web_marionette.models import DownloadResult
@@ -100,8 +108,10 @@ class TechemScraper(BaseScraper):
                 try:
                     page.goto(self.SITE_URL, wait_until='networkidle')
                     log_and_display('Techem page loaded', log=False, sticky=False)
-                except PlaywrightTimeoutError:
-                    return self._failure_result('Timeout loading Techem page')
+                except PlaywrightTimeoutError as e:
+                    raise ScraperNavigationError(
+                        'Timeout loading Techem page', url=self.SITE_URL, scraper_name='TechemScraper'
+                    ) from e
 
                 # Handle cookie banner (non-critical)
                 if not self.headless:
@@ -110,14 +120,20 @@ class TechemScraper(BaseScraper):
                 # Login
                 try:
                     self._login(page)
-                except PlaywrightTimeoutError:
-                    return self._failure_result('Login failed - check credentials or site availability')
+                except PlaywrightTimeoutError as e:
+                    raise ScraperAuthenticationError(
+                        'Login failed - check credentials or site availability',
+                        url=self.SITE_URL,
+                        scraper_name='TechemScraper',
+                    ) from e
 
                 # Download PDF
                 try:
                     self._download_pdf(page, output_path)
-                except PlaywrightTimeoutError:
-                    return self._failure_result('Timeout waiting for PDF download button')
+                except PlaywrightTimeoutError as e:
+                    raise ScraperDownloadError(
+                        'Timeout waiting for PDF download button', url=self.SITE_URL, scraper_name='TechemScraper'
+                    ) from e
 
                 finally:
                     browser.close()
@@ -129,12 +145,20 @@ class TechemScraper(BaseScraper):
                     publish_file_added(file_path=str(output_path), file_size=file_size, is_healthy=True)
 
                     log_and_display(f'Downloaded: {output_path.name}', log=True, sticky=False)
-                    return self._build_result(total_found=1, downloaded=1)
-                else:
-                    return self._failure_result('PDF failed health check')
 
+                    # Success case - all good
+                    return DownloadResult(success=True, total_found=1, downloaded=1, failed=0, errors=[])
+                else:
+                    # PDF failed health check
+                    return DownloadResult(
+                        success=False, total_found=1, downloaded=0, failed=1, errors=['PDF failed health check']
+                    )
+
+        except (ScraperNavigationError, ScraperAuthenticationError, ScraperDownloadError) as e:
+            log_and_display(f'Techem: {e}', level='error')
+            raise
         except Exception as e:
-            return self._failure_result(f'Unexpected error: {e!s}')
+            raise ScraperError(f'Techem: Unexpected error: {e!s}') from e
 
     @staticmethod
     def _handle_cookie_banner(page: Page) -> None:
@@ -200,47 +224,33 @@ class KfwScraper(BaseScraper):
                 finally:
                     browser.close()
 
+        except (ScraperAuthenticationError, ScraperNavigationError, ScraperConfigurationError) as e:
+            # Catastrophic errors - re-raise to handler
+            log_and_display(f'KFW: Fatal error - {e}', level='error')
+            raise
         except Exception as e:
-            return self._failure_result(f'Unexpected error: {e!s}')
+            # Unexpected errors - wrap and re-raise
+            raise ScraperError(f'KFW: Unexpected failure: {e}') from e
 
     def _execute_download_workflow(self, page: Page, context: BrowserContext) -> DownloadResult:
         """Execute the full download workflow."""
 
-        # Login (returns early on failure)
-        login_result = self._attempt_login(page)
-        if login_result:
-            return login_result
+        self._login(page)
 
-        # Navigate (returns early on failure)
-        nav_result = self._attempt_navigation(page)
-        if nav_result:
-            return nav_result
+        self._navigate_to_postbox(page)
 
         # Get documents
         download_buttons = page.locator("input[type='image'][alt='Dokument anzeigen']").all()
         if len(download_buttons) == 0:
-            return DownloadResult(success=False, total_found=0, downloaded=0, failed=0, errors=['No documents found'])
+            return DownloadResult(
+                success=False,
+                total_found=0,
+                downloaded=0,
+                failed=0,
+                errors=[],
+            )
 
-        # Download all documents
         return self._download_all_documents(page, context, download_buttons)
-
-    def _attempt_login(self, page: Page) -> DownloadResult | None:
-        """Attempt login. Returns failure result if unsuccessful, None if successful."""
-        try:
-            self._login(page)
-        except PlaywrightTimeoutError:
-            return self._failure_result('Login failed - check credentials or site availability')
-        else:
-            return None
-
-    def _attempt_navigation(self, page: Page) -> DownloadResult | None:
-        """Attempt navigation to postbox. Returns failure result if unsuccessful, None if successful."""
-        try:
-            page.goto(self.POSTBOX_URL)
-        except PlaywrightTimeoutError:
-            return self._failure_result('Failed to access document inbox')
-        else:
-            return None
 
     def _download_all_documents(
         self, page: Page, context: BrowserContext, download_buttons: list[Locator]
@@ -259,6 +269,7 @@ class KfwScraper(BaseScraper):
                 # Try download with retry logic
                 success = False
                 for attempt in range(self.MAX_DOWNLOAD_RETRIES + 1):
+                    # This returns bool, doesn't raise for document failures
                     if self._download_single_document(page, context, download_button, index):
                         success = True
                         break
@@ -274,22 +285,69 @@ class KfwScraper(BaseScraper):
                 else:
                     errors.append(f'Document {index}: Failed after {self.MAX_DOWNLOAD_RETRIES + 1} attempts')
 
-            except Exception as e:
+            except ScraperError:
+                # These should bubble up to the handler
+                raise
+            except Exception as e:  # noqa: BLE001
+                # Unexpected errors in the download process
                 error_msg = f'Document {index}: {e!s}'
                 log_and_display(error_msg, level='warning', log=True, sticky=False)
                 errors.append(error_msg)
 
-        return self._build_result(total_documents, success_count, errors)
+        # Determine if ALL documents succeeded
+        all_succeeded = success_count == total_documents and total_documents > 0
+
+        if errors:
+            log_and_display(
+                f'KFW: Downloaded {success_count}/{total_documents} documents, {len(errors)} errors', level='warning'
+            )
+        else:
+            log_and_display(f'KFW: Successfully downloaded all {success_count} documents', level='info')
+
+        return DownloadResult(
+            success=all_succeeded,  # To delete or not delete - that is the question
+            total_found=total_documents,
+            downloaded=success_count,
+            failed=len(errors),
+            errors=errors,
+        )
 
     def _login(self, page: Page) -> None:
-        """Execute KFW login sequence."""
-        page.goto(self.SITE_URL)
+        """Execute KFW login sequence.
 
-        page.fill('#BANKING_ID', self.username)
-        page.fill('#PIN', self.password)
-        page.click("input[name='login'][type='submit']")
+        Raises:
+            ScraperAuthenticationError: If login fails
+        """
+        try:
+            page.goto(self.SITE_URL)
 
-        page.wait_for_load_state('networkidle')
+            page.fill('#BANKING_ID', self.username)
+            page.fill('#PIN', self.password)
+            page.click("input[name='login'][type='submit']")
+
+            page.wait_for_load_state('networkidle')
+        except PlaywrightTimeoutError as e:
+            raise ScraperAuthenticationError(
+                'Login timeout - site may be slow or down', url=self.SITE_URL, scraper_name='KfwScraper'
+            ) from e
+        except Exception as e:
+            raise ScraperAuthenticationError(f'Login failed: {e}', url=self.SITE_URL, scraper_name='KfwScraper') from e
+
+    def _navigate_to_postbox(self, page: Page) -> None:
+        """Navigate to the postbox/inbox page.
+
+        Raises:
+            ScraperNavigationError: If navigation fails
+        """
+        try:
+            page.goto(self.POSTBOX_URL)
+        except PlaywrightTimeoutError as e:
+            raise ScraperNavigationError(
+                'Timeout accessing document inbox',
+                url=self.POSTBOX_URL,
+                scraper_name='KfwScraper',
+                expected_element='postbox',
+            ) from e
 
     def _download_single_document(
         self, page: Page, context: BrowserContext, download_button: Locator, doc_index: int
@@ -298,43 +356,54 @@ class KfwScraper(BaseScraper):
         Download a single document using request interception.
         Returns True if successful, False otherwise.
         """
-        # Get document ID from form
-        form = download_button.locator('xpath=ancestor::form[1]')
-        dokid = form.locator("input[name='dokid']").get_attribute('value')
+        try:
+            # Get document ID from form
+            form = download_button.locator('xpath=ancestor::form[1]')
+            dokid = form.locator("input[name='dokid']").get_attribute('value')
 
-        # Capture the POST request
-        captured_request = self._capture_download_request(context, download_button, page)
+            # Capture the POST request
+            captured_request = self._capture_download_request(context, download_button, page)
 
-        if not captured_request:
-            log_and_display(
-                f'Timeout: no request captured for document {doc_index}', level='warning', log=True, sticky=False
+            if not captured_request:
+                log_and_display(
+                    f'Timeout: no request captured for document {doc_index}', level='warning', log=True, sticky=False
+                )
+                return False
+
+            # Replay the request to get the PDF
+            response = context.request.post(
+                captured_request.url, data=captured_request.post_data, headers=captured_request.headers
             )
+
+            if response.status != 200:
+                log_and_display(
+                    f'Document {doc_index}: HTTP {response.status}', level='warning', log=True, sticky=False
+                )
+                return False
+
+        except (ScraperDownloadError, ScraperHealthCheckError):
+            # These are already handled and logged - just return False
             return False
+        except Exception as e:
+            # Unexpected errors - log AND re-raise as ScraperError
+            log_and_display(f'Document {doc_index}: Unexpected error - {e}', level='warning', log=True, sticky=False)
+            raise ScraperError(f'Unexpected error in document {doc_index}: {e}') from e
+        else:
+            # Save the PDF
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f'kfw_document_{doc_index}_{dokid}_{timestamp}.pdf'
+            output_path = Path(self.download_dir) / filename
 
-        # Replay the request to get the PDF
-        response = context.request.post(
-            captured_request.url, data=captured_request.post_data, headers=captured_request.headers
-        )
+            with Path(output_path).open('wb') as f:
+                f.write(response.body())
 
-        if response.status != 200:
-            log_and_display(f'Document {doc_index}: HTTP {response.status}', level='warning', log=True, sticky=False)
-            return False
+            file_size = Path(output_path).stat().st_size
+            is_healthy = is_pdf_healthy(output_path)
 
-        # Save the PDF
-        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f'kfw_document_{doc_index}_{dokid}_{timestamp}.pdf'
-        output_path = Path(self.download_dir) / filename
+            publish_file_added(file_path=str(output_path), file_size=file_size, is_healthy=is_healthy)
 
-        with Path(output_path).open('wb') as f:
-            f.write(response.body())
-
-        file_size = Path(output_path).stat().st_size
-        is_healthy = is_pdf_healthy(output_path)
-
-        publish_file_added(file_path=str(output_path), file_size=file_size, is_healthy=is_healthy)
-
-        log_and_display(f'Downloaded: {filename} ({len(response.body())} bytes)', log=True, sticky=False)
-        return True
+            log_and_display(f'Downloaded: {filename} ({len(response.body())} bytes)', log=True, sticky=False)
+            return True
 
     def _capture_download_request(
         self, context: BrowserContext, download_button: Locator, page: Page
