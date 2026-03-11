@@ -9,6 +9,15 @@ from pathlib import Path
 from brybox.core.audiora.file_ops import FileMover
 from brybox.core.audiora.filename import FilenameProcessor
 from brybox.core.audiora.metadata import AudioMetadataExtractor
+from brybox.core.audiora.path_builder import PathBuilder
+from brybox.exceptions.audio import (
+    AudioraAudioNotFoundError,
+    AudioraConfigurationError,
+    AudioraCorruptedFileError,
+    AudioraError,
+    AudioraFileOperationError,
+    AudioraMetadataError,
+)
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
 from brybox.utils.settings import BryboxSettings
 
@@ -69,6 +78,7 @@ class AudioraCore:
         # Initialize processors
         self.metadata_extractor = AudioMetadataExtractor()
         self.filename_processor = FilenameProcessor(self.config)
+        self.path_builder = PathBuilder(self.base_dir)
         self.file_mover = FileMover(self.base_dir, dry_run=dry_run)
 
     def process(self) -> _ProcessingContext:
@@ -77,12 +87,23 @@ class AudioraCore:
 
         Returns:
             ProcessingContext with all extracted information
+
+        Raises:
+            AudioraAudioNotFoundError: If audio file doesn't exist
+            AudioraMetadataError: If metadata extraction fails
+            AudioraConfigurationError: If configuration is invalid
+            AudioraFileOperationError: If path building fails
         """
         context = _ProcessingContext(audio_filepath=self.audio_filepath, base_dir=self.base_dir)
 
         filepath = Path(self.audio_filepath)
         filename_without_ext = filepath.stem
         extension = filepath.suffix
+
+        if not filepath.exists():
+            raise AudioraAudioNotFoundError(
+                f'Audio file not found: {self.audio_filepath}', audio_path=self.audio_filepath
+            )
 
         # Classify audio file
         context.category = self.filename_processor.classify_audio(filepath.name)
@@ -109,7 +130,7 @@ class AudioraCore:
         )
 
         # Build output path
-        built_path = self.file_mover.build_output_path(
+        built_path = self.path_builder.build_output_path(
             context.category, context.output_filename, self.config, self.audio_filepath
         )
         context.output_filepath = built_path or ''
@@ -121,21 +142,52 @@ class AudioraCore:
         Move file to organized location.
 
         Returns:
-            True if file was successfully processed
+            True if file was successfully processed (moved or identified as duplicate)
+            False if file had no category match (left in place)
+
+        Raises:
+            AudioraAudioNotFoundError: If source file doesn't exist
+            AudioraMetadataError: If metadata extraction fails
+            AudioraConfigurationError: If configuration is invalid (fatal)
+            AudioraFileOperationError: If file operations fail
+            AudioraCorruptedFileError: If moved file is corrupted
         """
-        context = self.process()
+        try:
+            context = self.process()
+        except AudioraAudioNotFoundError:
+            log_and_display(f'📄 File not found: {Path(self.audio_filepath).name}', level='error')
+            raise
+        except AudioraMetadataError as e:
+            log_and_display(f'📊 Metadata error for {Path(self.audio_filepath).name}: {e}', level='error')
+            raise
+        except AudioraConfigurationError as e:
+            log_and_display(f'⚙️ Configuration error: {e}', level='error')
+            raise
+        except AudioraFileOperationError as e:
+            log_and_display(f'📁 File operation error: {e}', level='error')
+            raise
+        except AudioraCorruptedFileError as e:
+            log_and_display(f'💥 Corrupted file: {e}', level='error')
+            raise
 
         if not context.category or not context.output_filepath:
             return False
 
-        # Move main file
-        success, is_new = self.file_mover.move_file(context.audio_filepath, context.output_filepath)
-
-        if not success:
-            return False
-
-        context.is_new_file = is_new
-        return True
+        try:
+            success, is_new = self.file_mover.move_file(context.audio_filepath, context.output_filepath)
+        except AudioraFileOperationError as e:
+            log_and_display(f'💾 File operation failed for {Path(self.audio_filepath).name}: {e}', level='error')
+            raise
+        else:
+            context.is_new_file = is_new
+            if is_new:
+                log_and_display(f'✅ Moved: {Path(self.audio_filepath).name} → {context.output_filepath}')
+            else:
+                log_and_display(
+                    f'🔄 Duplicate deleted: {Path(self.audio_filepath).name} (already exists in {context.category})',
+                    level='info',
+                )
+            return success
 
     @property
     def category(self) -> str | None:
@@ -155,7 +207,7 @@ class AudioraNexus:
 
     def __init__(
         self,
-        dir_path: str,
+        dir_path: str | Path,
         base_dir: str | None = None,
         config: dict | None = None,
         *,
@@ -168,18 +220,22 @@ class AudioraNexus:
         Args:
             dir_path: Directory containing audio files to process
             base_dir: Override target base directory
-            config_path: Path to config directory
             config: Pre-loaded config dict
             dry_run: If True, no files are moved or deleted
             processor_class: Processor class to use (for testing)
+
+        Raises:
+            AudioraConfigurationError: If directory doesn't exist
         """
-        self.dir_path = dir_path
+        self.dir_path = Path(dir_path)
         self.base_dir = base_dir
         self.dry_run = dry_run
         self.processor_class = processor_class
 
-        # Load config once for all files
         self.config = config or BryboxSettings().audiora
+
+        if not self.dir_path.exists():
+            raise AudioraConfigurationError(f'Directory does not exist: {dir_path}', audio_path=dir_path)
 
     def process_all(self, *, progress_bar: bool = True, file_extensions: list[str] | None = None) -> dict[str, bool]:
         """
@@ -195,7 +251,6 @@ class AudioraNexus:
         if file_extensions is None:
             file_extensions = ['.m4a', '.mp3', '.flac', '.wav']
 
-        # Gather all matching audio files
         audio_files = []
         for ext in file_extensions:
             audio_files.extend(Path(self.dir_path).glob(f'*{ext}'))
@@ -210,16 +265,37 @@ class AudioraNexus:
         )
 
         for audio_file in audio_files:
+            result = {'success': False, 'processed': False, 'category': None, 'error': None}
+
             try:
                 processor = self.processor_class(
-                    audio_filepath=audio_file, base_dir=self.base_dir, config=self.config, dry_run=self.dry_run
+                    audio_filepath=str(audio_file),
+                    base_dir=self.base_dir,
+                    config=self.config,
+                    dry_run=self.dry_run,
                 )
 
-                success = processor.shuttle_service()
-                results[audio_file] = success
+                processed = processor.shuttle_service()
 
-            except Exception as e:
-                log_and_display(f'Error processing {audio_file}: {e}', level='error')
-                results[audio_file] = False
+                result['success'] = True
+                result['processed'] = processed
+                result['category'] = processor.category
+
+            except AudioraError as e:
+                result['error'] = str(e)
+
+            except Exception as e:  # noqa: BLE001
+                result['error'] = f'Unexpected: {e}'
+                log_and_display(f'💥 Unexpected error for {audio_file.name}: {e}', level='error')
+
+            finally:
+                results[str(audio_file)] = result
+
+        # Summary
+        successful = sum(1 for r in results.values() if r['success'])
+        processed = sum(1 for r in results.values() if r['processed'])
+        log_and_display(
+            f'Completed: {processed} moved, {successful - processed} skipped, {len(results) - successful} failed'
+        )
 
         return results

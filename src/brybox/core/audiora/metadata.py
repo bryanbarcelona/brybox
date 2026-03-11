@@ -9,6 +9,11 @@ from pathlib import Path
 import exiftool
 from exiftool.exceptions import ExifToolExecuteError
 
+from brybox.exceptions.audio import (
+    AudioraAudioNotFoundError,
+    AudioraCorruptedFileError,
+    AudioraMetadataError,
+)
 from brybox.utils.logging import log_and_display
 
 
@@ -22,15 +27,32 @@ class AudioMetadataExtractor:
         """
         Extract Media Created date from audio file metadata.
 
-        Args:
-            file_path: Path to audio file
-
         Returns:
             Date string in YYYYMMDD format, or None if not found
+
+        Raises:
+            AudioraMetadataError: If metadata extraction fails catastrophically
+            AudioraAudioNotFoundError: If file doesn't exist
+            AudioraCorruptedFileError: If file is corrupted/unreadable
         """
+        file_path = Path(file_path)
+
+        # Validation failure = raise (file doesn't exist is exceptional)
+        if not file_path.exists():
+            raise AudioraAudioNotFoundError(f'Audio file not found: {file_path}', audio_path=file_path)
+
         try:
             with exiftool.ExifToolHelper() as et:
-                metadata = et.get_metadata(str(file_path))[0]
+                try:
+                    metadata = et.get_metadata(str(file_path))[0]
+                except ExifToolExecuteError as e:
+                    raise AudioraCorruptedFileError(
+                        f'Failed to read metadata from {file_path.name}: {e}', audio_path=file_path
+                    ) from e
+                except Exception as e:
+                    raise AudioraMetadataError(
+                        f'Unexpected error reading metadata from {file_path.name}: {e}', audio_path=file_path
+                    ) from e
 
                 # Try different date fields in order of preference
                 date_fields = [
@@ -45,13 +67,16 @@ class AudioMetadataExtractor:
                         parsed_date = self._parse_quicktime_date(date_str)
                         if parsed_date:
                             return parsed_date.strftime('%Y%m%d')
+                        continue
 
-                log_and_display(f'No media created date found in {Path(file_path).name}', level='warning')
                 return None
 
-        except ExifToolExecuteError as e:
-            log_and_display(f'Failed to read metadata from {Path(file_path).name}: {e}', level='error')
-            return None
+        except (AudioraAudioNotFoundError, AudioraCorruptedFileError, AudioraMetadataError):
+            raise
+        except Exception as e:
+            raise AudioraMetadataError(
+                f'Unexpected error processing {file_path.name}: {e}', audio_path=file_path
+            ) from e
 
     @staticmethod
     def _parse_quicktime_date(date_str: str) -> datetime | None:
@@ -135,7 +160,7 @@ class AudioMetadataExtractor:
                 f'Date mismatch for {filename}: '
                 f'metadata={metadata_date}, filename={filename_date}. '
                 f'Using metadata date.',
-                level='warning',
+                level='debug',
             )
 
         # Prefer metadata date over filename date

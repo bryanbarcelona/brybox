@@ -207,6 +207,7 @@ def test_videosith():
 
 def test_audiora():
 
+
     configure_logging()
     enable_verbose_logging()
     log_and_display('Logging is configured.', sticky=True)
@@ -337,7 +338,7 @@ if __name__ == '__main__':
     # main()
     #test_pixelporter()
     # test_videosith()
-    #test_audiora()
+    test_audiora()
     # test_inbox_kraken()
     #full_run_test()
-    test_doctopus()
+    #test_doctopus()
