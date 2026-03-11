@@ -122,14 +122,14 @@ class VideoSith:
             # Update internal path reference
             self._file_path = target_path
 
-            return True
-
         except ConversionError as e:
             log_and_display(f'Conversion failed: {e}', level='error')
             return False
         except Exception:
             log_and_display('Unexpected error during conversion', level='error')
             return False
+        else:
+            return True
 
     def rename_mp4(self) -> None:
         """

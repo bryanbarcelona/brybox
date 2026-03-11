@@ -88,9 +88,8 @@ class FileMover:
                 comparison_fields = ['File:FileSize', 'QuickTime:Duration', 'QuickTime:MediaCreateDate']
 
                 for field in comparison_fields:
-                    if field in meta1 and field in meta2:
-                        if meta1[field] != meta2[field]:
-                            return False
+                    if field in meta1 and field in meta2 and meta1[field] != meta2[field]:
+                        return False
 
                 return True
 
@@ -165,7 +164,7 @@ class FileMover:
                 return False, False
 
             log_and_display(f'Moved {source} to {destination}.')
-            publish_file_moved(source, destination, file_size, True)
+            publish_file_moved(source, destination, file_size, is_healthy=True)
             return True, True
 
     @staticmethod

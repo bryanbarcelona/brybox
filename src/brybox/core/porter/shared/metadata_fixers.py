@@ -39,7 +39,7 @@ class ExifTimestampFixer:
         # Read DateTimeOriginal from all temp images
         image_dates = {}
 
-        for source_path, temp_image_path, temp_sidecars in mappings:
+        for _source_path, temp_image_path, _temp_sidecars in mappings:
             try:
                 # Use exiftool to read EXIF
                 result = subprocess.run(
@@ -80,7 +80,7 @@ class ExifTimestampFixer:
 
             # Increment by 1 second until we find a unique timestamp
             while adjusted_dt in unique_dates:
-                adjusted_dt = adjusted_dt + timedelta(seconds=1)
+                adjusted_dt += timedelta(seconds=1)
 
             unique_dates.add(adjusted_dt)
 

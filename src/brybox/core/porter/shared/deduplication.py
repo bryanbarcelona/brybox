@@ -43,7 +43,7 @@ def remove_duplicates(
     # Track which temp files to keep
     files_to_keep = set()
 
-    for hash_value, duplicate_files in hash_groups.items():
+    for _hash_value, duplicate_files in hash_groups.items():
         if len(duplicate_files) == 1:
             # Unique file - keep it
             files_to_keep.add(duplicate_files[0])

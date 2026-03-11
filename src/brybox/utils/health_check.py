@@ -16,9 +16,10 @@ def is_pdf_healthy(file_path: str | Path) -> bool:
     try:
         with pdfplumber.open(file_path) as pdf:
             _ = pdf.pages[0]
-        return True
     except Exception:
         return False
+    else:
+        return True
 
 
 # TODO: Extend with more image check support (e.g. HEIC)
@@ -30,9 +31,10 @@ def is_image_healthy(file_path: str | Path) -> bool:
     try:
         with Image.open(file_path) as img:
             img.verify()
-        return True
     except Exception:
         return False
+    else:
+        return True
 
 
 # --- Dispatcher / main API ---

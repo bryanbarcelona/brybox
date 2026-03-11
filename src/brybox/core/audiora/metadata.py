@@ -130,14 +130,13 @@ class AudioMetadataExtractor:
             log_and_display(f'No date found in metadata or filename: {filename}', level='warning')
             return None
 
-        if metadata_date and filename_date:
-            if metadata_date != filename_date:
-                log_and_display(
-                    f'Date mismatch for {filename}: '
-                    f'metadata={metadata_date}, filename={filename_date}. '
-                    f'Using metadata date.',
-                    level='warning',
-                )
+        if metadata_date and filename_date and metadata_date != filename_date:
+            log_and_display(
+                f'Date mismatch for {filename}: '
+                f'metadata={metadata_date}, filename={filename_date}. '
+                f'Using metadata date.',
+                level='warning',
+            )
 
         # Prefer metadata date over filename date
         return metadata_date or filename_date

@@ -43,13 +43,13 @@ class MetadataWriter:
             MetadataWriteError: If writing fails
         """
         # Format time offset string
-        if time_offset is not None:
-            if time_offset < 0:
-                offset_str = f'-{abs(time_offset):02d}:00"'
-            else:
-                offset_str = f'+{time_offset:02d}:00"'
-        else:
-            offset_str = '"'
+        offset_str = (
+            f'-{abs(time_offset):02d}:00"'
+            if time_offset is not None and time_offset < 0
+            else f'+{time_offset:02d}:00"'
+            if time_offset is not None and time_offset >= 0
+            else '"'
+        )
 
         # Build date parameter
         date_str = creation_date.strftime('%Y:%m:%d %H:%M:%S')

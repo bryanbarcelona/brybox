@@ -57,9 +57,10 @@ class EventBus:
         with self._lock:
             try:
                 self._subscribers[event_type].remove(handler)
-                return True
             except ValueError:
                 return False
+            else:
+                return True
 
     def publish(self, event: EventType) -> None:
         """

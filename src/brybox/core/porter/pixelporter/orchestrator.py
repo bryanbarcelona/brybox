@@ -7,7 +7,7 @@ from brybox.core.porter.shared.file_filters import ImageFileFilter
 from brybox.core.porter.shared.metadata_fixers import ExifTimestampFixer
 from brybox.core.porter.shared.orchestration import run_porter_pipeline
 from brybox.core.porter.shared.protocols import PorterResult
-from brybox.utils.logging import get_configured_logger
+from brybox.utils.logging import get_configured_logger, log_and_display
 from brybox.utils.settings import BryboxSettings
 
 logger = get_configured_logger('PixelPorter')
@@ -18,10 +18,11 @@ def _get_default_processor() -> type | None:
     try:
         from brybox.core.snap_jedi import SnapJedi  # noqa: PLC0415
 
-        return SnapJedi
     except ImportError:
-        logger.warning('SnapJedi not available, files will be moved as-is')
+        log_and_display('SnapJedi not available, files will be moved as-is', level='warning')
         return None
+    else:
+        return SnapJedi
 
 
 def _get_default_deduplicator() -> Any | None:
@@ -31,7 +32,7 @@ def _get_default_deduplicator() -> Any | None:
 
         return HashDeduplicator()
     except ImportError:
-        logger.warning('HashDeduplicator not available, deduplication disabled')
+        log_and_display('HashDeduplicator not available, deduplication disabled', level='warning')
         return None
 
 

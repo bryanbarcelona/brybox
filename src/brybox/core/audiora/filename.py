@@ -129,7 +129,7 @@ class FilenameProcessor:
             parts = [p for p in [date, session_name] if p]
             return f'{" ".join(parts)}{extension}'
 
-        template = categories[category].get('rename_template', '{date} {session_name}')
+        template = categories[category].get('rename_template', '{date} {session_name}')  # noqa: RUF027
 
         # Replace template variables
         filename = template.format(date=date or '', session_name=session_name or '')

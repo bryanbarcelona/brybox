@@ -205,7 +205,6 @@ class KfwScraper(BaseScraper):
 
     def _execute_download_workflow(self, page: Page, context: BrowserContext) -> DownloadResult:
         """Execute the full download workflow."""
-        errors = []
 
         # Login (returns early on failure)
         login_result = self._attempt_login(page)
@@ -229,17 +228,19 @@ class KfwScraper(BaseScraper):
         """Attempt login. Returns failure result if unsuccessful, None if successful."""
         try:
             self._login(page)
-            return None
         except PlaywrightTimeoutError:
             return self._failure_result('Login failed - check credentials or site availability')
+        else:
+            return None
 
     def _attempt_navigation(self, page: Page) -> DownloadResult | None:
         """Attempt navigation to postbox. Returns failure result if unsuccessful, None if successful."""
         try:
             page.goto(self.POSTBOX_URL)
-            return None
         except PlaywrightTimeoutError:
             return self._failure_result('Failed to access document inbox')
+        else:
+            return None
 
     def _download_all_documents(
         self, page: Page, context: BrowserContext, download_buttons: list[Locator]
