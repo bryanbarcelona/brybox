@@ -1,19 +1,18 @@
 import datetime
 import logging
-from abc import ABC, abstractmethod
 from pathlib import Path
 
 from playwright.sync_api import (
-    Browser,
     BrowserContext,
     Locator,
     Page,
-    Playwright,
     Request,
     TimeoutError as PlaywrightTimeoutError,
     sync_playwright,
 )
 
+from brybox.core.models.scrapers import DownloadResult
+from brybox.core.web_marionette.base import BaseScraper
 from brybox.events.bus import publish_file_added
 from brybox.exceptions.scrapers import (
     ScraperAuthenticationError,
@@ -25,178 +24,8 @@ from brybox.exceptions.scrapers import (
 )
 from brybox.utils.health_check import is_pdf_healthy
 from brybox.utils.logging import log_and_display
-from brybox.web_marionette.models import DownloadResult
 
 logger = logging.getLogger('WebMarionette')
-
-
-class BaseScraper(ABC):
-    """
-    Base class for web scrapers that download documents from various portals.
-
-    Provides common browser setup, error handling patterns, and result construction.
-    Each concrete scraper implements its specific download logic.
-    """
-
-    def __init__(self, username: str, password: str, download_dir: str | None = None, *, headless: bool = True):
-        self.username = username
-        self.password = password
-        self.download_dir = download_dir or str(Path.home() / 'Downloads')
-        self.headless = headless
-
-    @abstractmethod
-    def download(self) -> DownloadResult:
-        """
-        Execute the scraping operation to download documents.
-        Each scraper implements its specific logic.
-        """
-
-    def _create_browser_context(self, playwright: Playwright, **context_kwargs: dict) -> tuple[Browser, BrowserContext]:
-        """Create and configure browser context with common settings."""
-        browser = playwright.chromium.launch(headless=self.headless)
-        return browser, browser.new_context(**context_kwargs)
-
-    @staticmethod
-    def _failure_result(error_msg: str, total_found: int = 0) -> DownloadResult:
-        """Construct a failure result with consistent logging."""
-        log_and_display(error_msg, level='error', log=True, sticky=False)
-        return DownloadResult(
-            success=False,
-            total_found=total_found,
-            downloaded=0,
-            failed=total_found if total_found > 0 else 1,
-            errors=[error_msg],
-        )
-
-    @staticmethod
-    def _build_result(total_found: int, downloaded: int, errors: list[str] | None = None) -> DownloadResult:
-        """Construct result from operation statistics."""
-        if errors is None:
-            errors = []
-
-        failed = total_found - downloaded
-        success = downloaded == total_found and total_found > 0
-
-        return DownloadResult(
-            success=success, total_found=total_found, downloaded=downloaded, failed=failed, errors=errors
-        )
-
-
-class TechemScraper(BaseScraper):
-    """Scraper for Techem heating cost invoices."""
-
-    SITE_URL = 'https://mieter.techem.de/'
-
-    def download(self) -> DownloadResult:
-        """Download the latest Techem invoice PDF."""
-        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        output_path = Path(self.download_dir) / f'techem_invoice_{timestamp}.pdf'
-
-        try:
-            with sync_playwright() as playwright:
-                browser, context = self._create_browser_context(
-                    playwright,
-                    viewport={'width': 1280, 'height': 1024},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                    'AppleWebKit/537.36 (KHTML, like Gecko) '
-                    'Chrome/118.0.5993.90 Safari/537.36',
-                    device_scale_factor=1,
-                )
-                page = context.new_page()
-
-                # Navigate to site
-                try:
-                    page.goto(self.SITE_URL, wait_until='networkidle')
-                    log_and_display('Techem page loaded', log=False, sticky=False)
-                except PlaywrightTimeoutError as e:
-                    raise ScraperNavigationError(
-                        'Timeout loading Techem page', url=self.SITE_URL, scraper_name='TechemScraper'
-                    ) from e
-
-                # Handle cookie banner (non-critical)
-                if not self.headless:
-                    self._handle_cookie_banner(page)
-
-                # Login
-                try:
-                    self._login(page)
-                except PlaywrightTimeoutError as e:
-                    raise ScraperAuthenticationError(
-                        'Login failed - check credentials or site availability',
-                        url=self.SITE_URL,
-                        scraper_name='TechemScraper',
-                    ) from e
-
-                # Download PDF
-                try:
-                    self._download_pdf(page, output_path)
-                except PlaywrightTimeoutError as e:
-                    raise ScraperDownloadError(
-                        'Timeout waiting for PDF download button', url=self.SITE_URL, scraper_name='TechemScraper'
-                    ) from e
-
-                finally:
-                    browser.close()
-
-                # Verify PDF health
-                if is_pdf_healthy(output_path):
-                    file_size = Path(output_path).stat().st_size
-
-                    publish_file_added(file_path=str(output_path), file_size=file_size, is_healthy=True)
-
-                    log_and_display(f'Downloaded: {output_path.name}', log=True, sticky=False)
-
-                    # Success case - all good
-                    return DownloadResult(success=True, total_found=1, downloaded=1, failed=0, errors=[])
-                else:
-                    # PDF failed health check
-                    return DownloadResult(
-                        success=False, total_found=1, downloaded=0, failed=1, errors=['PDF failed health check']
-                    )
-
-        except (ScraperNavigationError, ScraperAuthenticationError, ScraperDownloadError) as e:
-            log_and_display(f'Techem: {e}', level='error')
-            raise
-        except Exception as e:
-            raise ScraperError(f'Techem: Unexpected error: {e!s}') from e
-
-    @staticmethod
-    def _handle_cookie_banner(page: Page) -> None:
-        """Attempt to dismiss cookie banner if present."""
-        try:
-            cookie_button = page.get_by_role('button', name='Use necessary cookies only')
-            cookie_button.wait_for(state='visible', timeout=5000)
-            cookie_button.click()
-            log_and_display('Cookie banner accepted', log=False, sticky=False)
-        except PlaywrightTimeoutError:
-            log_and_display('Cookie banner not visible, skipping', log=False, sticky=False)
-
-    def _login(self, page: Page) -> None:
-        """Execute login sequence."""
-        login_button = page.get_by_role('button', name='Login').first
-        login_button.wait_for(state='visible', timeout=10000)
-        login_button.click()
-        log_and_display('Login button clicked', log=False, sticky=False)
-
-        page.fill('#signInName', self.username)
-        page.fill('#password', self.password)
-        page.click('#next')
-
-    @staticmethod
-    def _download_pdf(page: Page, output_path: Path) -> None:
-        """Download the PDF invoice."""
-        # Try multiple possible button names
-        pdf_button = page.get_by_role('button', name='PDF herunterladen').or_(
-            page.get_by_role('button', name='Download')
-        )
-
-        pdf_button.wait_for(state='visible', timeout=15000)
-
-        with page.expect_download() as download_info:
-            pdf_button.click()
-
-        download = download_info.value
-        download.save_as(str(output_path))
 
 
 class KfwScraper(BaseScraper):
@@ -251,6 +80,43 @@ class KfwScraper(BaseScraper):
             )
 
         return self._download_all_documents(page, context, download_buttons)
+
+    def _login(self, page: Page) -> None:
+        """Execute KFW login sequence.
+
+        Raises:
+            ScraperAuthenticationError: If login fails
+        """
+        try:
+            page.goto(self.SITE_URL)
+
+            page.fill('#BANKING_ID', self.username)
+            page.fill('#PIN', self.password)
+            page.click("input[name='login'][type='submit']")
+
+            page.wait_for_load_state('networkidle')
+        except PlaywrightTimeoutError as e:
+            raise ScraperAuthenticationError(
+                'Login timeout - site may be slow or down', url=self.SITE_URL, scraper_name='KfwScraper'
+            ) from e
+        except Exception as e:
+            raise ScraperAuthenticationError(f'Login failed: {e}', url=self.SITE_URL, scraper_name='KfwScraper') from e
+
+    def _navigate_to_postbox(self, page: Page) -> None:
+        """Navigate to the postbox/inbox page.
+
+        Raises:
+            ScraperNavigationError: If navigation fails
+        """
+        try:
+            page.goto(self.POSTBOX_URL)
+        except PlaywrightTimeoutError as e:
+            raise ScraperNavigationError(
+                'Timeout accessing document inbox',
+                url=self.POSTBOX_URL,
+                scraper_name='KfwScraper',
+                expected_element='postbox',
+            ) from e
 
     def _download_all_documents(
         self, page: Page, context: BrowserContext, download_buttons: list[Locator]
@@ -311,43 +177,6 @@ class KfwScraper(BaseScraper):
             failed=len(errors),
             errors=errors,
         )
-
-    def _login(self, page: Page) -> None:
-        """Execute KFW login sequence.
-
-        Raises:
-            ScraperAuthenticationError: If login fails
-        """
-        try:
-            page.goto(self.SITE_URL)
-
-            page.fill('#BANKING_ID', self.username)
-            page.fill('#PIN', self.password)
-            page.click("input[name='login'][type='submit']")
-
-            page.wait_for_load_state('networkidle')
-        except PlaywrightTimeoutError as e:
-            raise ScraperAuthenticationError(
-                'Login timeout - site may be slow or down', url=self.SITE_URL, scraper_name='KfwScraper'
-            ) from e
-        except Exception as e:
-            raise ScraperAuthenticationError(f'Login failed: {e}', url=self.SITE_URL, scraper_name='KfwScraper') from e
-
-    def _navigate_to_postbox(self, page: Page) -> None:
-        """Navigate to the postbox/inbox page.
-
-        Raises:
-            ScraperNavigationError: If navigation fails
-        """
-        try:
-            page.goto(self.POSTBOX_URL)
-        except PlaywrightTimeoutError as e:
-            raise ScraperNavigationError(
-                'Timeout accessing document inbox',
-                url=self.POSTBOX_URL,
-                scraper_name='KfwScraper',
-                expected_element='postbox',
-            ) from e
 
     def _download_single_document(
         self, page: Page, context: BrowserContext, download_button: Locator, doc_index: int

@@ -7,6 +7,8 @@ from bs4 import BeautifulSoup
 
 from brybox.core.inbox_kraken.helpers import classify_link, get_dropbox_download_link, resolve_redirected_url, save_path
 from brybox.core.models.email import ProcessingContext, ProcessResult
+from brybox.core.web_marionette.kfw import KfwScraper
+from brybox.core.web_marionette.techem import TechemScraper
 from brybox.events.bus import publish_file_added
 from brybox.exceptions.emails import (
     InboxKrakenConfigurationError,
@@ -24,7 +26,6 @@ from brybox.exceptions.scrapers import (
     ScraperNavigationError,
 )
 from brybox.utils.logging import log_and_display
-from brybox.web_marionette.scrapers import KfwScraper, TechemScraper
 
 
 def download_pdf_handler(ctx: ProcessingContext) -> ProcessResult:
