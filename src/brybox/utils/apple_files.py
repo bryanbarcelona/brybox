@@ -175,8 +175,13 @@ class AppleSidecarManager:
                 publish_file_deleted(str(sidecar), size)
                 deleted.append(sidecar)
                 log_and_display(f'Deleted sidecar: {sidecar.name}')
-            except Exception as e:
-                log_and_display(f'Failed to delete sidecar {sidecar.name}: {e}')
+            except FileNotFoundError:
+                deleted.append(sidecar)
+                log_and_display(f'Sidecar already deleted: {sidecar.name}', level='info')
+            except (PermissionError, OSError) as e:
+                log_and_display(f'Cannot delete sidecar {sidecar.name}: {e}', level='warning')
+            except Exception as e:  # noqa: BLE001 - Batch operation, don't let one failure stop others
+                log_and_display(f'Unexpected error deleting sidecar {sidecar.name}: {e}', level='error')
 
         return deleted
 
@@ -213,8 +218,13 @@ class AppleSidecarManager:
                 deleted.append(sidecar)
                 publish_file_deleted(str(sidecar), size)
                 log_and_display(f'Deleted sidecar: {sidecar.name}')
-            except Exception as e:
-                log_and_display(f'Failed to delete sidecar {sidecar.name}: {e}')
+            except FileNotFoundError:
+                deleted.append(sidecar)
+                log_and_display(f'Sidecar already deleted: {sidecar.name}', level='info')
+            except (PermissionError, OSError) as e:
+                log_and_display(f'Cannot delete sidecar {sidecar.name}: {e}', level='warning')
+            except Exception as e:  # noqa: BLE001 - Batch operation, don't let one failure stop others
+                log_and_display(f'Unexpected error deleting sidecar {sidecar.name}: {e}', level='error')
 
         # Delete primary image
         try:
@@ -223,7 +233,12 @@ class AppleSidecarManager:
             deleted.append(image_path)
             publish_file_deleted(str(image_path), size)
             log_and_display(f'Deleted image: {image_path.name}')
-        except Exception as e:
-            log_and_display(f'Failed to delete image {image_path.name}: {e}')
+        except FileNotFoundError:
+            deleted.append(image_path)
+            log_and_display(f'Image already deleted: {image_path.name}', level='info')
+        except (PermissionError, OSError) as e:
+            log_and_display(f'Cannot delete image {image_path.name}: {e}', level='warning')
+        except Exception as e:  # noqa: BLE001 - Don't let image failure hide sidecar results
+            log_and_display(f'Unexpected error deleting image {image_path.name}: {e}', level='error')
 
         return deleted

@@ -16,7 +16,7 @@ def is_pdf_healthy(file_path: str | Path) -> bool:
     try:
         with pdfplumber.open(file_path) as pdf:
             _ = pdf.pages[0]
-    except Exception:
+    except Exception:  # noqa: BLE001 - Any error means unhealthy, caller doesn't need specifics
         return False
     else:
         return True
@@ -31,7 +31,7 @@ def is_image_healthy(file_path: str | Path) -> bool:
     try:
         with Image.open(file_path) as img:
             img.verify()
-    except Exception:
+    except Exception:  # noqa: BLE001 - Any error means unhealthy, caller doesn't need specifics
         return False
     else:
         return True
