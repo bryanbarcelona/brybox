@@ -13,12 +13,7 @@ from brybox.core.porter import push_photos, push_videos
 from brybox.core.snap_jedi import SnapJedi
 from brybox.core.videosith import VideoSith
 from brybox.events.verifier import DirectoryVerifier
-from brybox.utils.logging import (
-    enable_verbose_logging,
-    log_and_display,
-    log_manager,
-    trackerator,
-)
+from brybox.utils.logging import configure_logging, enable_verbose_logging, log_and_display, log_manager, trackerator
 
 # Prevent "No handler found" warnings for the package logger itself
 logging.getLogger(__name__).addHandler(NullHandler())
@@ -34,6 +29,7 @@ __all__ = [
     'InboxKraken',
     'SnapJedi',
     'VideoSith',
+    'configure_logging',
     'enable_verbose_logging',
     'log_and_display',
     'log_manager',

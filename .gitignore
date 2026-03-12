@@ -41,6 +41,9 @@ configs/*.json
 # Local Github Actions Runner
 .actrc
 
+# code coverage report
+.coverage
+
 # Still under development - ignore
 
 tester.py
