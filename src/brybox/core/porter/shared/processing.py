@@ -5,8 +5,85 @@ from pathlib import Path
 from brybox.core.porter.models.image import ProcessResult
 from brybox.core.porter.shared.protocols import FileProcessor, PorterResult
 from brybox.events.bus import publish_file_renamed
+from brybox.exceptions.base import MediaProcessorError
 from brybox.utils.apple_files import AppleSidecarManager
 from brybox.utils.logging import log_and_display
+
+
+def _handle_processor_result(
+    source_path: Path,
+    temp_image_path: Path,
+    process_result: ProcessResult,
+    result: PorterResult,
+) -> bool:
+    """
+    Handle the result from processor and update result counters.
+
+    Returns:
+        True if successful, False if failed
+    """
+    if not process_result.success:
+        error_msg = process_result.error_message or 'Unknown error'
+        log_and_display(f'✗ Processing failed: {temp_image_path.name} - {error_msg}', level='error')
+        result.failed += 1
+        result.errors.append(f'{temp_image_path.name}: {error_msg}')
+        return False
+
+    if not process_result.is_healthy:
+        log_and_display(f'✗ Health check failed: {temp_image_path.name}', level='error')
+        result.failed += 1
+        result.errors.append(f'{temp_image_path.name}: Health check failed')
+        return False
+
+    if not process_result.target_path.exists():
+        log_and_display(f'✗ Output file missing: {process_result.target_path.name}', level='error')
+        result.failed += 1
+        result.errors.append(f'{temp_image_path.name}: Output file not found')
+        return False
+
+    # Success - publish rename event
+    publish_file_renamed(
+        old_path=str(temp_image_path),
+        new_path=str(process_result.target_path),
+        file_size=process_result.target_path.stat().st_size,
+        is_healthy=process_result.is_healthy,
+    )
+
+    # Clean up source files
+    deleted_files = AppleSidecarManager.delete_image_with_sidecars(source_path)
+    sidecar_count = len(deleted_files) - 1  # Subtract the image itself
+
+    result.processed += 1
+    log_and_display(
+        f'✓ Processed: {source_path.name} → {process_result.target_path.name} (cleaned {sidecar_count} sidecar(s))'
+    )
+    return True
+
+
+def _process_single_file(
+    source_path: Path,
+    temp_image_path: Path,
+    processor_class: type[FileProcessor],
+    result: PorterResult,
+) -> None:
+    """
+    Process a single file and update result counters.
+
+    Only handles MediaProcessorError (expected processor failures).
+    All other errors bubble up to main orchestrator.
+    """
+    try:
+        processor = processor_class()
+        processor.open(temp_image_path)
+
+        process_result: ProcessResult = processor.process()
+        _handle_processor_result(source_path, temp_image_path, process_result, result)
+
+    except MediaProcessorError as e:
+        error_msg = f'Processor failed for {temp_image_path.name}: {e}'
+        log_and_display(f'✗ {error_msg}', level='error')
+        result.failed += 1
+        result.errors.append(error_msg)
 
 
 def process_and_cleanup(
@@ -29,11 +106,11 @@ def process_and_cleanup(
         processor_class: Class implementing FileProcessor protocol
         dry_run: Simulation mode
         action_prefix: Logging prefix
-        result: PushResult to update with stats
+        result: PorterResult to update with stats
     """
     if dry_run:
         log_and_display(f'{action_prefix} Processing: Skipped (runs on staged files only)', log=False)
-        log_and_display(f'{action_prefix} Would process {len(mappings)} image(s) with SnapJedi', log=False)
+        log_and_display(f'{action_prefix} Would process {len(mappings)} file(s) with processor', log=False)
         return
 
     if not mappings:
@@ -42,56 +119,8 @@ def process_and_cleanup(
 
     log_and_display(f'Processing {len(mappings)} file(s)...')
 
-    for source_path, temp_image_path, _temp_sidecar_paths in mappings:
-        try:
-            processor = processor_class()
-
-            processor.open(temp_image_path)
-
-            process_result: ProcessResult = processor.process()
-
-            if not process_result.success:
-                error_msg = process_result.error_message or 'Unknown error'
-                log_and_display(f'✗ Processing failed: {temp_image_path.name} - {error_msg}', level='error')
-                result.failed += 1
-                result.errors.append(f'{temp_image_path.name}: {error_msg}')
-                continue
-
-            if not process_result.is_healthy:
-                log_and_display(f'✗ Health check failed: {temp_image_path.name}', level='error')
-                result.failed += 1
-                result.errors.append(f'{temp_image_path.name}: Health check failed')
-                continue
-
-            if not process_result.target_path.exists():
-                log_and_display(f'✗ Output file missing: {process_result.target_path.name}', level='error')
-                result.failed += 1
-                result.errors.append(f'{temp_image_path.name}: Output file not found')
-                continue
-
-            publish_file_renamed(
-                old_path=str(temp_image_path),
-                new_path=str(process_result.target_path),
-                file_size=process_result.target_path.stat().st_size,
-                is_healthy=process_result.is_healthy,
-            )
-
-            result.processed += 1
-
-            deleted_files = AppleSidecarManager.delete_image_with_sidecars(source_path)
-
-            sidecar_count = len(deleted_files) - 1  # Subtract the image itself
-            log_and_display(
-                f'✓ Processed: {source_path.name} → {process_result.target_path.name} '
-                f'(cleaned {sidecar_count} sidecar(s))'
-            )
-
-        except Exception as e:
-            error_msg = f'Exception processing {temp_image_path.name}: {e}'
-            log_and_display(f'✗ {error_msg}', level='error')
-            result.failed += 1
-            result.errors.append(error_msg)
-            continue
+    for source_path, temp_image_path, _ in mappings:
+        _process_single_file(source_path, temp_image_path, processor_class, result)
 
     # Summary
     if result.failed > 0:

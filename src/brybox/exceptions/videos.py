@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from brybox.exceptions.base import BryboxError
+from brybox.exceptions.base import MediaProcessorError
 
 
-class VideoSithError(BryboxError):
+class VideoSithError(MediaProcessorError):
     def __init__(self, message: str, video_path: str | Path | None = None):
         self.video_path = Path(video_path) if video_path else None
         super().__init__(message)

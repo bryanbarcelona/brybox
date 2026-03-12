@@ -5,10 +5,10 @@ All exceptions inherit from SnapJediError → BryboxError.
 
 from pathlib import Path
 
-from brybox.exceptions.base import BryboxError
+from brybox.exceptions.base import MediaProcessorError
 
 
-class SnapJediError(BryboxError):
+class SnapJediError(MediaProcessorError):
     """Base exception for all SnapJedi-related errors."""
 
     def __init__(self, message: str, image_path: str | Path | None = None):
