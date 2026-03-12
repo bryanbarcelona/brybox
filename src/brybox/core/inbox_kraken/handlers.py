@@ -26,6 +26,7 @@ from brybox.exceptions.scrapers import (
     ScraperNavigationError,
 )
 from brybox.utils.logging import log_and_display
+from brybox.utils.specialized_tools import filter_audio_links
 
 
 def download_pdf_handler(ctx: ProcessingContext) -> ProcessResult:
@@ -104,7 +105,14 @@ def dropbox_audio_handler(ctx: ProcessingContext) -> ProcessResult:
     save_dir = ctx.save_dir
 
     soup = BeautifulSoup(meta.body_html, 'html.parser')
-    links = [a['href'] for a in soup.find_all('a', href=True) if a['href'].startswith('http')]
+
+    links = [
+        {'url': a['href'], 'text': a.get_text(strip=True)}
+        for a in soup.find_all('a', href=True)
+        if a['href'].startswith('http')
+    ]
+
+    links = filter_audio_links(links)
 
     downloaded_count = 0
     errors = []
