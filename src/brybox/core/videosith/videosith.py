@@ -50,7 +50,6 @@ class VideoSith:
         Raises:
             VideoSithToolNotFoundError: If required tools are missing (fatal)
         """
-        print('NEW VIDEOSITH HERE')
         try:
             self._metadata_reader = metadata_reader or MetadataReader()
             self._metadata_writer = metadata_writer or MetadataWriter()

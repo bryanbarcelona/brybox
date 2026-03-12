@@ -129,6 +129,8 @@ class FFmpegConverter(VideoConverter):
             OSError: If file operations fail
         """
         cmd = [
+            'cmd',
+            '/c',
             self.ffmpeg_path,
             '-i',
             str(source),
@@ -171,6 +173,8 @@ class FFmpegConverter(VideoConverter):
             OSError: If file operations fail
         """
         cmd = [
+            'cmd',
+            '/c',
             self.ffmpeg_path,
             '-i',
             str(source),
