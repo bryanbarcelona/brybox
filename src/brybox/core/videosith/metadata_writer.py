@@ -3,7 +3,12 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from brybox.utils.logging import get_configured_logger, log_and_display
+from brybox.exceptions.videos import (
+    VideoSithFileOperationError,
+    VideoSithMetadataWriteError,
+    VideoSithToolNotFoundError,
+)
+from brybox.utils.logging import get_configured_logger
 
 logger = get_configured_logger('VideoMetadataWriter')
 
@@ -51,37 +56,47 @@ class MetadataWriter:
             else '"'
         )
 
-        # Build date parameter
+        # Build date parameter - ExifTool expects specific format
         date_str = creation_date.strftime('%Y:%m:%d %H:%M:%S')
-        date_param = f'-QuickTime:CreationDate="{date_str}' + offset_str
+        date_param = f'-QuickTime:CreationDate={date_str}{offset_str}'
 
         # Build command
-        command = [
+        cmd = [
             self.exiftool_path,
             '-m',  # Ignore minor errors
             '-P',  # Preserve file modification date
             '-overwrite_original_in_place',
             date_param,
-            f'"{file_path}"',
+            str(file_path),
         ]
-
-        # Join command (ExifTool quirk - needs shell parsing for complex params)
-        command_str = ' '.join(command)
 
         try:
             result = subprocess.run(
-                command_str, check=False, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30
+                cmd,
+                check=False,  # We'll check return code manually
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=30,
             )
 
-            if result.returncode == 0:
-                log_and_display(f'Set creation date on {file_path.name}')
-            else:
-                raise MetadataWriteError(f'ExifTool returned error code: {result.returncode}')
+            if result.returncode != 0:
+                raise VideoSithMetadataWriteError(
+                    f'Failed to set creation date on {file_path.name}: ExifTool returned {result.returncode}',
+                    video_path=file_path,
+                    stderr=result.stderr,
+                )
 
-        except subprocess.TimeoutExpired:
-            raise MetadataWriteError('Setting creation date timed out')
-        except Exception as e:
-            raise MetadataWriteError(f'Failed to set creation date: {e!s}')
+        except subprocess.TimeoutExpired as e:
+            raise VideoSithMetadataWriteError(
+                f'Setting creation date timed out after 30s for {file_path.name}',
+                video_path=file_path,
+                timeout_seconds=30,
+            ) from e
+        except (OSError, PermissionError) as e:
+            raise VideoSithFileOperationError(
+                f'File operation failed while setting creation date: {e}', source_path=file_path
+            ) from e
 
     def set_gps_coordinates(self, file_path: Path, latitude: float, longitude: float, altitude: float) -> None:
         """
@@ -94,33 +109,52 @@ class MetadataWriter:
             altitude: GPS altitude
 
         Raises:
-            MetadataWriteError: If writing fails
+            VideoSithMetadataWriteError: If writing fails
+            VideoSithFileOperationError: If file operations fail
         """
         # Skip if coordinates are all zeros (invalid)
         if latitude == 0 and longitude == 0 and altitude == 0:
-            log_and_display(f'Skipping GPS write for {file_path.name} (no valid coords)')
-            return
+            return  # Not an error, just nothing to write
 
         # Build GPS parameter
         gps_param = f'-QuickTime:GPSCoordinates="{latitude}, {longitude}, {altitude}"'
 
-        # Build command
-        command = [self.exiftool_path, '-m', '-P', '-overwrite_original_in_place', gps_param, str(file_path)]
+        cmd = [
+            self.exiftool_path,
+            '-m',
+            '-P',
+            '-overwrite_original_in_place',
+            gps_param,
+            str(file_path),
+        ]
 
         try:
             result = subprocess.run(
-                command, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30
+                cmd,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=30,
             )
 
-            if result.returncode == 0:
-                log_and_display(f'Set GPS coordinates on {file_path.name}')
-            else:
-                raise MetadataWriteError(f'ExifTool returned error code: {result.returncode}')
+            if result.returncode != 0:
+                raise VideoSithMetadataWriteError(
+                    f'Failed to set GPS coordinates on {file_path.name}: ExifTool returned {result.returncode}',
+                    video_path=file_path,
+                    stderr=result.stderr,
+                )
 
-        except subprocess.TimeoutExpired:
-            raise MetadataWriteError('Setting GPS coordinates timed out')
-        except Exception as e:
-            raise MetadataWriteError(f'Failed to set GPS coordinates: {e!s}') from e
+        except subprocess.TimeoutExpired as e:
+            raise VideoSithMetadataWriteError(
+                f'Setting GPS coordinates timed out after 30s for {file_path.name}',
+                video_path=file_path,
+                timeout_seconds=30,
+            ) from e
+        except (OSError, PermissionError) as e:
+            raise VideoSithFileOperationError(
+                f'File operation failed while setting GPS coordinates: {e}', source_path=file_path
+            ) from e
 
     @staticmethod
     def _find_exiftool() -> str:
@@ -131,9 +165,9 @@ class MetadataWriter:
             Path to exiftool
 
         Raises:
-            RuntimeError: If exiftool not found
+            VideoSithToolNotFoundError: If exiftool not found
         """
         if shutil.which('exiftool'):
             return 'exiftool'
 
-        raise RuntimeError('exiftool not found. Install exiftool and add to PATH.')
+        raise VideoSithToolNotFoundError('exiftool not found. Install exiftool and add to PATH.', tool_name='exiftool')

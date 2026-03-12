@@ -1,9 +1,9 @@
 import filecmp
 from pathlib import Path
 
-from brybox.core.models import ProcessResult
+from brybox.core.models.image import ImageMetadata, ProcessResult
 from brybox.core.snap_jedi.converter import ImageMagickConverter
-from brybox.core.snap_jedi.metadata import ImageMetadata, MetadataReader
+from brybox.core.snap_jedi.metadata import MetadataReader
 from brybox.core.snap_jedi.naming import PathStrategy
 from brybox.events.bus import publish_file_deleted, publish_file_renamed
 from brybox.exceptions.images import (

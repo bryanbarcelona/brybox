@@ -1,24 +1,13 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
-from typing import NamedTuple
-
-
-class ProcessResult(NamedTuple):
-    """Result of processing a single file."""
-
-    success: bool
-    target_path: Path
-    is_healthy: bool
-    error_message: str = ''
 
 
 @dataclass
-class ImageMetadata:
+class VideoMetadata:
     """
-    Structured metadata extracted from an image.
+    Structured metadata extracted from a video.
 
-    All fields are Optional since images may lack metadata.
+    All fields are Optional since videos may lack metadata.
     """
 
     creation_date: datetime | None = None
@@ -27,4 +16,5 @@ class ImageMetadata:
     gps_altitude: float = 0.0
     timezone: str | None = None
     time_offset: int | None = None  # Hours from UTC
+    parsed_filename_date: datetime | None = None  # Date from filename if present
     raw_exif: dict = field(default_factory=dict)

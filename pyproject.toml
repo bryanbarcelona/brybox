@@ -72,6 +72,8 @@ docstring-code-format = true
 "tests/*" = ["ANN001", "ANN201", "PLC2701", "PT006", "PLR6301"]
 "src/brybox/utils/settings.py" = ["ANN002", "ANN003", "ARG004"]
 "src/brybox/core/snap_jedi/converter.py" = ["S404", "S603"]
+"src/brybox/core/videosith/converter.py" = ["S404", "S603"]
+"src/brybox/core/videosith/metadata_writer.py" = ["S404", "S603"]
 
 [tool.ty.rules]
 invalid-return-type = "error"

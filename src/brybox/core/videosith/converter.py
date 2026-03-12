@@ -3,13 +3,15 @@ import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from brybox.utils.logging import get_configured_logger, log_and_display
+from brybox.exceptions.videos import (
+    VideoSithConversionFailedError,
+    VideoSithConversionTimeoutError,
+    VideoSithFileOperationError,
+    VideoSithToolNotFoundError,
+)
+from brybox.utils.logging import get_configured_logger
 
 logger = get_configured_logger('VideoConverter')
-
-
-class ConversionError(Exception):
-    """Raised when video conversion fails."""
 
 
 class VideoConverter(ABC):
@@ -25,7 +27,7 @@ class VideoConverter(ABC):
             target: Target MP4 path
 
         Raises:
-            ConversionError: If conversion fails
+            VideoSithConversionError: If conversion fails
         """
 
 
@@ -43,8 +45,13 @@ class FFmpegConverter(VideoConverter):
 
         Args:
             ffmpeg_path: Path to ffmpeg command. If None, attempts to find it.
+
+        Raises:
+            VideoSithToolNotFoundError: If ffmpeg not found
         """
         self.ffmpeg_path = ffmpeg_path or self._find_ffmpeg()
+        self.STREAM_COPY_TIMEOUT = 300  # 5 minutes
+        self.REENCODE_TIMEOUT = 600  # 10 minutes
 
     def convert_to_mp4(self, source: Path, target: Path) -> None:
         """
@@ -59,10 +66,69 @@ class FFmpegConverter(VideoConverter):
             target: Target MP4 path
 
         Raises:
-            ConversionError: If conversion fails
+            VideoSithConversionFailedError: If both conversion attempts fail
+            VideoSithConversionTimeoutError: If conversion times out
+            VideoSithFileOperationError: If file operations fail
         """
-        # Primary: stream copy (fast)
-        primary_cmd = [
+        # Try stream copy first
+        try:
+            self._run_stream_copy(source, target)
+        except subprocess.TimeoutExpired as e:
+            self._safe_cleanup(target)
+            raise VideoSithConversionTimeoutError(
+                f'Stream copy timed out after {self.STREAM_COPY_TIMEOUT}s for {source.name}',
+                video_path=source,
+                timeout_seconds=self.STREAM_COPY_TIMEOUT,
+            ) from e
+        except subprocess.CalledProcessError:
+            # Stream copy failed - try re-encode
+            self._safe_cleanup(target)
+        except (OSError, PermissionError) as e:
+            self._safe_cleanup(target)
+            raise VideoSithFileOperationError(
+                f'File operation failed during stream copy: {e}', source_path=source, dest_path=target
+            ) from e
+        else:
+            return
+
+        # Try re-encode
+        try:
+            self._run_reencode(source, target)
+        except subprocess.TimeoutExpired as e:
+            self._safe_cleanup(target)
+            raise VideoSithConversionTimeoutError(
+                f'Re-encode timed out after {self.REENCODE_TIMEOUT}s for {source.name}',
+                video_path=source,
+                timeout_seconds=self.REENCODE_TIMEOUT,
+            ) from e
+        except subprocess.CalledProcessError as e:
+            self._safe_cleanup(target)
+            error_msg = f'Both stream copy and re-encoding failed for {source.name}'
+            if e.stderr:
+                error_msg += f'\nFFmpeg error: {e.stderr}'
+            raise VideoSithConversionFailedError(error_msg, video_path=source, stderr=e.stderr) from e
+        except (OSError, PermissionError) as e:
+            self._safe_cleanup(target)
+            raise VideoSithFileOperationError(
+                f'File operation failed during re-encode: {e}', source_path=source, dest_path=target
+            ) from e
+        else:
+            return
+
+    def _run_stream_copy(self, source: Path, target: Path) -> None:
+        """
+        Run stream copy conversion.
+
+        Args:
+            source: Source video path
+            target: Target MP4 path
+
+        Raises:
+            subprocess.TimeoutExpired: If timeout occurs
+            subprocess.CalledProcessError: If ffmpeg fails
+            OSError: If file operations fail
+        """
+        cmd = [
             self.ffmpeg_path,
             '-i',
             str(source),
@@ -72,11 +138,39 @@ class FFmpegConverter(VideoConverter):
             'copy',
             '-map_metadata',
             '0',
+            '-movflags',
+            '+faststart',
             str(target),
         ]
 
-        # Fallback re-encode
-        fallback_cmd = [
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=self.STREAM_COPY_TIMEOUT,
+            )
+        except FileNotFoundError as e:
+            raise VideoSithToolNotFoundError(
+                f'FFmpeg not executable at {self.ffmpeg_path}. Check installation and permissions.', tool_name='ffmpeg'
+            ) from e
+
+    def _run_reencode(self, source: Path, target: Path) -> None:
+        """
+        Run re-encode conversion.
+
+        Args:
+            source: Source video path
+            target: Target MP4 path
+
+        Raises:
+            subprocess.TimeoutExpired: If timeout occurs
+            subprocess.CalledProcessError: If ffmpeg fails
+            OSError: If file operations fail
+        """
+        cmd = [
             self.ffmpeg_path,
             '-i',
             str(source),
@@ -92,51 +186,41 @@ class FFmpegConverter(VideoConverter):
             '192k',
             '-map_metadata',
             '0',
+            '-movflags',
+            '+faststart',
             str(target),
         ]
 
         try:
-            # Try primary command (stream copy)
-            result = subprocess.run(
-                primary_cmd,
-                check=False,
+            subprocess.run(
+                cmd,
+                check=True,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=300,  # 5 minute timeout
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=self.REENCODE_TIMEOUT,
             )
+        except FileNotFoundError as e:
+            raise VideoSithToolNotFoundError(
+                f'FFmpeg not executable at {self.ffmpeg_path}. Check installation and permissions.', tool_name='ffmpeg'
+            ) from e
 
-            if result.returncode == 0:
-                log_and_display(f'Converted {source.name} using stream copy')
-                return
+    @staticmethod
+    def _safe_cleanup(path: Path) -> None:
+        """
+        Safely delete a file if it exists, ignoring errors.
 
-            # Primary failed, clean up and try fallback
-            log_and_display(f'Stream copy failed for {source.name}, re-encoding...', level='warning')
+        This is a cleanup helper - it NEVER raises exceptions.
+        Only handles expected filesystem errors, lets unexpected ones bubble up.
 
-            if target.exists():
-                target.unlink()
-
-            fallback_result = subprocess.run(
-                fallback_cmd,
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=600,  # 10 minute timeout for re-encoding
-            )
-
-            if fallback_result.returncode == 0:
-                log_and_display(f'Converted {source.name} using re-encoding')
-                return
-
-            raise ConversionError('Both stream copy and re-encoding failed')
-
-        except subprocess.TimeoutExpired:
-            if target.exists():
-                target.unlink()
-            raise ConversionError('Conversion timed out')
-        except Exception as e:
-            if target.exists():
-                target.unlink()
-            raise ConversionError(f'Conversion failed: {e!s}')
+        Args:
+            path: Path to delete
+        """
+        try:
+            if path.exists():
+                path.unlink()
+        except (FileNotFoundError, PermissionError, OSError):
+            pass  # Expected filesystem errors - ignore silently
 
     @staticmethod
     def _find_ffmpeg() -> str:
@@ -147,9 +231,22 @@ class FFmpegConverter(VideoConverter):
             Path to ffmpeg
 
         Raises:
-            RuntimeError: If ffmpeg not found
+            VideoSithToolNotFoundError: If ffmpeg not found
         """
         if shutil.which('ffmpeg'):
             return 'ffmpeg'
 
-        raise RuntimeError('FFmpeg not found. Install FFmpeg and add to PATH.')
+        # Check common locations on Windows
+        common_paths = [
+            r'C:\Program Files\ffmpeg\bin\ffmpeg.exe',
+            r'C:\ffmpeg\bin\ffmpeg.exe',
+        ]
+
+        for path in common_paths:
+            if Path(path).exists():
+                return path
+
+        raise VideoSithToolNotFoundError(
+            'FFmpeg not found. Install FFmpeg from https://ffmpeg.org/ and add to PATH or install to C:\\ffmpeg\\',
+            tool_name='ffmpeg',
+        )

@@ -1,5 +1,4 @@
 import shutil
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -8,6 +7,7 @@ import pytz
 from exiftool.exceptions import ExifToolExecuteError
 from timezonefinder import TimezoneFinder
 
+from brybox.core.models.image import ImageMetadata
 from brybox.exceptions.images import (
     SnapJediImageNotFoundError,
     SnapJediMetadataError,
@@ -15,23 +15,6 @@ from brybox.exceptions.images import (
     SnapJediMetadataReadError,
     SnapJediToolNotFoundError,
 )
-
-
-@dataclass
-class ImageMetadata:
-    """
-    Structured metadata extracted from an image.
-
-    All fields are Optional since images may lack metadata.
-    """
-
-    creation_date: datetime | None = None
-    gps_latitude: float = 0.0
-    gps_longitude: float = 0.0
-    gps_altitude: float = 0.0
-    timezone: str | None = None
-    time_offset: int | None = None  # Hours from UTC
-    raw_exif: dict = field(default_factory=dict)
 
 
 class MetadataReader:

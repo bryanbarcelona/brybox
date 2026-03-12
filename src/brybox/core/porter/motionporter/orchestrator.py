@@ -15,7 +15,7 @@ logger = get_configured_logger('MotionPorter')
 def _get_default_processor() -> type | None:
     """Lazy-load VideoSith as default processor."""
     try:
-        from brybox.core.videosith import VideoSith  # noqa: PLC0415
+        from brybox.core.videosith.videosith import VideoSith  # noqa: PLC0415
 
     except ImportError:
         log_and_display('VideoSith not available, files will be moved as-is', level='warning')

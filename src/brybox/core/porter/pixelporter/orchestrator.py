@@ -16,7 +16,7 @@ logger = get_configured_logger('PixelPorter')
 def _get_default_processor() -> type | None:
     """Lazy-load SnapJedi as default processor."""
     try:
-        from brybox.core.snap_jedi import SnapJedi  # noqa: PLC0415
+        from brybox.core.snap_jedi.snapjedi import SnapJedi  # noqa: PLC0415
 
     except ImportError:
         log_and_display('SnapJedi not available, files will be moved as-is', level='warning')
