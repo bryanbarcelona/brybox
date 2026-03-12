@@ -1,3 +1,22 @@
+## v0.7.3 (2026-03-12)
+
+### Fix
+
+- **videosith**: wrap ffmpeg calls with cmd /c to support batch file wrappers
+- **utils**: resolve BLE001 lint violations in health_check and apple_files
+- **lint**: resolve TID252 import violations and other opportunistic linting issues
+
+### Refactor
+
+- **videosith**: implement custom exception hierarchy and align with three-tier architecture
+- **web-marionette**: move web_marionette from top-level into core/
+- **web-marionette**: implement proper exception hierarchy and success flag logic
+- **audiora**: implement consistent error handling pattern
+- address TRY300, SIM108, SIM102, PLR6140, FBT003, F841, B007, and RUF027 lint violations
+- **project**: fix FBT002, G004, and PTH(118, 120, 122, 207) linting violations
+- **inbox-kraken**: migrate handlers and engine to exception bubbling architecture
+- **snapjedi**: implement custom exception hierarchy and resolve linting issues
+
 ## v0.7.2 (2026-03-08)
 
 ### Fix
