@@ -1,3 +1,9 @@
+## v0.7.2 (2026-03-08)
+
+### Fix
+
+- **ci**: publish to real PyPI instead of testpypi
+
 ## v0.7.1 (2026-03-08)
 
 ### Fix
