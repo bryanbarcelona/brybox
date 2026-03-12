@@ -85,9 +85,8 @@ class EventBus:
         for handler in handlers:
             try:
                 handler(event)
-            except Exception:
-                # Silently continue processing other handlers even if one fails
-                pass
+            except Exception:  # noqa: BLE001,S112
+                continue
 
     def get_subscriber_count(self, event_type: type[EventType]) -> int:
         """Get the number of subscribers for an event type."""
@@ -115,7 +114,6 @@ def publish_file_moved(source_path: str, destination_path: str, file_size: int, 
         file_size: Size of the moved file in bytes
         is_healthy: Whether the file passed health checks
     """
-
     event = FileMovedEvent(
         source_path=source_path,
         destination_path=destination_path,
@@ -123,7 +121,6 @@ def publish_file_moved(source_path: str, destination_path: str, file_size: int, 
         is_healthy=is_healthy,
         timestamp=datetime.now(),
     )
-
     event_bus.publish(event)
 
 
@@ -135,13 +132,12 @@ def publish_file_deleted(file_path: str, file_size: int) -> None:
         file_path: Path of the file that was deleted
         file_size: Size of the deleted file in bytes
     """
-
     event = FileDeletedEvent(file_path=file_path, file_size=file_size, timestamp=datetime.now())
-
     event_bus.publish(event)
 
 
 def publish_file_copied(
+    *,
     source_path: str,
     destination_path: str,
     source_size: int,
@@ -197,5 +193,10 @@ def publish_file_added(file_path: str, file_size: int, is_healthy: bool) -> None
         file_size: Size of the file in bytes
         is_healthy: Whether the file passed health checks
     """
-    event = FileAddedEvent(file_path=file_path, file_size=file_size, is_healthy=is_healthy, timestamp=datetime.now())
+    event = FileAddedEvent(
+        file_path=file_path,
+        file_size=file_size,
+        is_healthy=is_healthy,
+        timestamp=datetime.now(),
+    )
     event_bus.publish(event)

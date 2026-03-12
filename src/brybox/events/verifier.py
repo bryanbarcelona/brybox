@@ -171,7 +171,7 @@ class DirectoryVerifier:
             log_and_display(f'Add event (target): {Path(file_path).name}', level='debug')
         else:
             # Unrecognized location — log for investigation
-            log_and_display(f'Add event (untracked): {file_path} not under source or target dirs', level='warning')
+            log_and_display(f'Add event (untracked): {file_path} not under source or target dirs', level='debug')
 
     def report(self) -> bool:
         """
@@ -262,4 +262,3 @@ class DirectoryVerifier:
         event_bus.unsubscribe(FileDeletedEvent, self._handle_file_deleted)
         event_bus.unsubscribe(FileCopiedEvent, self._handle_file_copied)
         event_bus.unsubscribe(FileRenamedEvent, self._handle_file_renamed)
-        log_and_display('Unsubscribed from file operation events', level='debug')
