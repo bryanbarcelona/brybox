@@ -32,7 +32,7 @@ class BryboxSettings:
         self._initialized = True
 
     def _get_best_file_path(self, filename: str) -> Path | None:
-        candidates = [d / filename for d in self.search_dirs if (d / filename).exists()]
+        candidates = [d / filename for d in self.search_dirs if d is not None and (d / filename).exists()]
         return max(candidates, key=lambda p: p.stat().st_mtime) if candidates else None
 
     def _load_component(self, filename: str) -> dict[str, Any]:

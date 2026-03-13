@@ -172,7 +172,7 @@ class AppleSidecarManager:
             try:
                 size = sidecar.stat().st_size
                 sidecar.unlink()
-                publish_file_deleted(str(sidecar), size)
+                publish_file_deleted(sidecar, size)
                 deleted.append(sidecar)
                 log_and_display(f'Deleted sidecar: {sidecar.name}')
             except FileNotFoundError:
@@ -216,7 +216,7 @@ class AppleSidecarManager:
                 size = sidecar.stat().st_size
                 sidecar.unlink()
                 deleted.append(sidecar)
-                publish_file_deleted(str(sidecar), size)
+                publish_file_deleted(sidecar, size)
                 log_and_display(f'Deleted sidecar: {sidecar.name}')
             except FileNotFoundError:
                 deleted.append(sidecar)
@@ -231,7 +231,7 @@ class AppleSidecarManager:
             size = image_path.stat().st_size
             image_path.unlink()
             deleted.append(image_path)
-            publish_file_deleted(str(image_path), size)
+            publish_file_deleted(image_path, size)
             log_and_display(f'Deleted image: {image_path.name}')
         except FileNotFoundError:
             deleted.append(image_path)

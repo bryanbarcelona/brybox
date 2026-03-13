@@ -58,6 +58,11 @@ class InboxKraken:
         if mail_conn:
             self.mail = mail_conn
         else:
+            if not e_creds.email or not isinstance(e_creds.email, str):
+                raise InboxKrakenConfigurationError('Email username must be a non-empty string', config_key='email')
+
+            if not e_creds.password or not isinstance(e_creds.password, str):
+                raise InboxKrakenConfigurationError('Email password must be a non-empty string', config_key='password')
             host = e_creds.imap_server or 'imap.gmail.com'
             self.mail = imaplib.IMAP4_SSL(host)
             self.mail.login(e_creds.email, e_creds.password)

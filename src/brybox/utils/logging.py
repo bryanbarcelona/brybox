@@ -9,13 +9,7 @@ from pathlib import Path
 from typing import TypeVar
 
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    TextColumn,
-    TimeElapsedColumn,
-)
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TaskID, TextColumn, TimeElapsedColumn
 
 T = TypeVar('T')
 
@@ -102,7 +96,7 @@ class ConsoleLogger:
     def __init__(self) -> None:
         self.console = Console()
         self._progress: Progress | None = None
-        self._task: int | None = None
+        self._task: TaskID | None = None
         # --- explicit wiring point ----------------------------------------- #
         self.logger: logging.Logger | None = None
         self._last_was_sticky: bool = False
@@ -133,7 +127,7 @@ class ConsoleLogger:
 
     def finalize_progress(self, final_description: str | None = None) -> None:
         """Replace description one last time and shut the bar down."""
-        if not self._progress:
+        if not self._progress or self._task is None:
             return
         if final_description is not None:
             self._progress.update(self._task, description=final_description)
@@ -169,7 +163,7 @@ class ConsoleLogger:
                 self.console.print(message)
             self._last_was_sticky = True
 
-        elif self._progress:
+        elif self._progress and self._task is not None:
             self._progress.update(self._task, description=message)
             self._last_was_sticky = True
 

@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 class EmailCredentials:
     """Email account credentials and connection settings."""
 
-    email: str
-    password: str
+    email: str | None
+    password: str | None
     imap_server: str
     imap_port: int = 993
 
