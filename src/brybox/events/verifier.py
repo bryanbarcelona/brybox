@@ -20,7 +20,7 @@ class DirectoryVerifier:
     actual filesystem to detect verification failures.
     """
 
-    def __init__(self, source_dir: str, target_dir: str):
+    def __init__(self, source_dir: str | Path, target_dir: str | Path):
         """
         Initialize verifier and take initial filesystem snapshots.
 
@@ -28,8 +28,8 @@ class DirectoryVerifier:
             source_dir: Directory where files are processed from
             target_dir: Directory where files are moved to
         """
-        self.source_dir = str(Path(source_dir).resolve())
-        self.target_dir = str(Path(target_dir).resolve())
+        self.source_dir = Path(source_dir).resolve()
+        self.target_dir = Path(target_dir).resolve()
 
         # Take initial snapshots
         self.initial_source_files = self._scan_directory(self.source_dir)
@@ -53,7 +53,7 @@ class DirectoryVerifier:
         )
 
     @staticmethod
-    def _scan_directory(directory: str | Path) -> set[str]:
+    def _scan_directory(directory: Path) -> set[Path]:
         """
         Scan directory and return set of all file paths.
 
@@ -61,15 +61,13 @@ class DirectoryVerifier:
             directory: Directory to scan recursively
 
         Returns:
-            Set of absolute file paths
+            Set of absolute file paths as Path objects
         """
-        directory = Path(directory)
-
         if not directory.exists():
             directory.mkdir(parents=True)
             return set()
 
-        return {str(p.resolve()) for p in directory.rglob('*') if p.is_file()}
+        return {p.resolve() for p in directory.rglob('*') if p.is_file()}
 
     def _handle_file_moved(self, event: FileMovedEvent) -> None:
         """
@@ -78,8 +76,8 @@ class DirectoryVerifier:
         Args:
             event: File move event with source and destination paths
         """
-        source_path = str(Path(event.source_path).resolve())
-        dest_path = str(Path(event.destination_path).resolve())
+        source_path = event.source_path.resolve()
+        dest_path = event.destination_path.resolve()
 
         # File should no longer be in source location
         self.expected_source_files.discard(source_path)
@@ -87,7 +85,7 @@ class DirectoryVerifier:
         # File should now be in destination location
         self.expected_target_files.add(dest_path)
 
-        log_and_display(f'Move event: {Path(source_path).name} -> {Path(dest_path).name}', level='debug')
+        log_and_display(f'Move event: {source_path.name} -> {dest_path.name}', level='debug')
 
     def _handle_file_deleted(self, event: FileDeletedEvent) -> None:
         """
@@ -96,25 +94,25 @@ class DirectoryVerifier:
         Args:
             event: File deletion event with file path
         """
-        file_path = str(Path(event.file_path).resolve())
+        file_path = event.file_path.resolve()
 
         # File should no longer exist anywhere
         self.expected_source_files.discard(file_path)
         # Note: deletions typically happen in source, but discard from target too for safety
         self.expected_target_files.discard(file_path)
 
-        log_and_display(f'Delete event: {Path(file_path).name}', level='debug')
+        log_and_display(f'Delete event: {file_path.name}', level='debug')
 
     def _handle_file_copied(self, event: FileCopiedEvent) -> None:
         """
         Copy: source stays, destination gains the file.
         """
-        dest_path = str(Path(event.destination_path).resolve())
+        dest_path = event.destination_path.resolve()
 
         # source is intentionally left untouched
         self.expected_target_files.add(dest_path)
 
-        log_and_display(f'Copy event: {Path(dest_path).name} added to target', level='debug')
+        log_and_display(f'Copy event: {dest_path.name} added to target', level='debug')
 
     def _handle_file_renamed(self, event: FileRenamedEvent) -> None:
         """
@@ -128,26 +126,26 @@ class DirectoryVerifier:
         Args:
             event: File rename event with old_path and new_path.
         """
-        old_path = str(Path(event.old_path).resolve())
-        new_path = str(Path(event.new_path).resolve())
+        old_path = event.old_path.resolve()
+        new_path = event.new_path.resolve()
 
         # Determine which expected set contains the old path
         if old_path in self.expected_source_files:
             self.expected_source_files.discard(old_path)
             self.expected_source_files.add(new_path)
-            log_and_display(f'Rename event (source): {Path(old_path).name} -> {Path(new_path).name}', level='debug')
+            log_and_display(f'Rename event (source): {old_path.name} -> {new_path.name}', level='debug')
         elif old_path in self.expected_target_files:
             self.expected_target_files.discard(old_path)
             self.expected_target_files.add(new_path)
-            log_and_display(f'Rename event (target): {Path(old_path).name} -> {Path(new_path).name}', level='debug')
+            log_and_display(f'Rename event (target): {old_path.name} -> {new_path.name}', level='debug')
         else:
             # Edge-case: rename of an untracked file; treat as a new file in the
             # directory implied by new_path.
-            if new_path.startswith(self.source_dir):
+            if new_path.is_relative_to(self.source_dir):
                 self.expected_source_files.add(new_path)
-            elif new_path.startswith(self.target_dir):
+            elif new_path.is_relative_to(self.target_dir):
                 self.expected_target_files.add(new_path)
-            log_and_display(f'Rename event (untracked): {Path(old_path).name} -> {Path(new_path).name}', level='debug')
+            log_and_display(f'Rename event (untracked): {old_path.name} -> {new_path.name}', level='debug')
 
     def _handle_file_added(self, event: FileAddedEvent) -> None:
         """
@@ -160,15 +158,15 @@ class DirectoryVerifier:
         Args:
             event: File addition event with file path and metadata
         """
-        file_path = str(Path(event.file_path).resolve())
+        file_path = event.file_path.resolve()
 
         # Determine whether the added file belongs to source or target directory
-        if file_path.startswith(str(Path(self.source_dir).resolve())):
+        if file_path.is_relative_to(self.source_dir):
             self.expected_source_files.add(file_path)
-            log_and_display(f'Add event (source): {Path(file_path).name}', level='debug')
-        elif file_path.startswith(str(Path(self.target_dir).resolve())):
+            log_and_display(f'Add event (source): {file_path.name}', level='debug')
+        elif file_path.is_relative_to(self.target_dir):
             self.expected_target_files.add(file_path)
-            log_and_display(f'Add event (target): {Path(file_path).name}', level='debug')
+            log_and_display(f'Add event (target): {file_path.name}', level='debug')
         else:
             # Unrecognized location — log for investigation
             log_and_display(f'Add event (untracked): {file_path} not under source or target dirs', level='debug')
@@ -203,7 +201,7 @@ class DirectoryVerifier:
         return overall_success
 
     @staticmethod
-    def _verify_directory(dir_name: str, expected: set[str], actual: set[str]) -> bool:
+    def _verify_directory(dir_name: str, expected: set[Path], actual: set[Path]) -> bool:
         """
         Compare expected vs actual file sets for a directory.
 
@@ -226,12 +224,12 @@ class DirectoryVerifier:
         if missing_files:
             log_and_display(f'✗ Missing files in {dir_name} directory:')
             for file_path in sorted(missing_files):
-                log_and_display(f'  - {Path(file_path).name}')
+                log_and_display(f'  - {file_path.name}')
 
         if unexpected_files:
             log_and_display(f'✗ Unexpected files in {dir_name} directory:')
             for file_path in sorted(unexpected_files):
-                log_and_display(f'  + {Path(file_path).name}')
+                log_and_display(f'  + {file_path.name}')
 
         return False
 

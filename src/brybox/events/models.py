@@ -17,8 +17,8 @@ class FileMovedEvent:
     passes health checks. Failed moves or unhealthy files do not generate events.
     """
 
-    source_path: str
-    destination_path: str
+    source_path: Path
+    destination_path: Path
     file_size: int
     is_healthy: bool
     timestamp: datetime
@@ -34,22 +34,22 @@ class FileMovedEvent:
     @property
     def source_name(self) -> str:
         """Get the filename from source path."""
-        return Path(self.source_path).name
+        return self.source_path.name
 
     @property
     def destination_name(self) -> str:
         """Get the filename from destination path."""
-        return Path(self.destination_path).name
+        return self.destination_path.name
 
     @property
-    def source_dir(self) -> str:
+    def source_dir(self) -> Path:
         """Get the directory from source path."""
-        return str(Path(self.source_path).parent)
+        return self.source_path.parent
 
     @property
-    def destination_dir(self) -> str:
+    def destination_dir(self) -> Path:
         """Get the directory from destination path."""
-        return str(Path(self.destination_path).parent)
+        return self.destination_path.parent
 
     def __repr__(self) -> str:
         """Human-readable representation for debugging."""
@@ -68,7 +68,7 @@ class FileDeletedEvent:
     This event is published for successful file deletions.
     """
 
-    file_path: str
+    file_path: Path
     file_size: int
     timestamp: datetime
 
@@ -83,12 +83,12 @@ class FileDeletedEvent:
     @property
     def filename(self) -> str:
         """Get the filename from file path."""
-        return Path(self.file_path).name
+        return self.file_path.name
 
     @property
-    def file_dir(self) -> str:
+    def file_dir(self) -> Path:
         """Get the directory from file path."""
-        return str(Path(self.file_path).parent)
+        return self.file_path.parent
 
     def __repr__(self) -> str:
         """Human-readable representation for debugging."""
@@ -102,8 +102,8 @@ class FileCopiedEvent:
     Both files must exist, be healthy, and sizes must match expectations.
     """
 
-    source_path: str
-    destination_path: str
+    source_path: Path
+    destination_path: Path
     source_size: int
     destination_size: int
     source_healthy: bool
@@ -120,19 +120,19 @@ class FileCopiedEvent:
 
     @property
     def source_name(self) -> str:
-        return Path(self.source_path).name
+        return self.source_path.name
 
     @property
     def destination_name(self) -> str:
-        return Path(self.destination_path).name
+        return self.destination_path.name
 
     @property
-    def source_dir(self) -> str:
-        return str(Path(self.source_path).parent)
+    def source_dir(self) -> Path:
+        return self.source_path.parent
 
     @property
-    def destination_dir(self) -> str:
-        return str(Path(self.destination_path).parent)
+    def destination_dir(self) -> Path:
+        return self.destination_path.parent
 
     def __repr__(self) -> str:
         return (
@@ -150,8 +150,8 @@ class FileRenamedEvent:
     The source file no longer exists, and the destination file must exist and be healthy.
     """
 
-    old_path: str
-    new_path: str
+    old_path: Path
+    new_path: Path
     file_size: int
     destination_healthy: bool
     timestamp: datetime
@@ -166,19 +166,19 @@ class FileRenamedEvent:
 
     @property
     def old_name(self) -> str:
-        return Path(self.old_path).name
+        return self.old_path.name
 
     @property
     def new_name(self) -> str:
-        return Path(self.new_path).name
+        return self.new_path.name
 
     @property
-    def source_dir(self) -> str:
-        return str(Path(self.old_path).parent)
+    def source_dir(self) -> Path:
+        return self.old_path.parent
 
     @property
-    def destination_dir(self) -> str:
-        return str(Path(self.new_path).parent)
+    def destination_dir(self) -> Path:
+        return self.new_path.parent
 
     def __repr__(self) -> str:
         return (
@@ -198,7 +198,7 @@ class FileAddedEvent:
     that pass health and integrity checks.
     """
 
-    file_path: str
+    file_path: Path
     file_size: int
     is_healthy: bool
     timestamp: datetime
@@ -215,12 +215,12 @@ class FileAddedEvent:
     @property
     def filename(self) -> str:
         """Get the filename from file path."""
-        return Path(self.file_path).name
+        return self.file_path.name
 
     @property
-    def file_dir(self) -> str:
+    def file_dir(self) -> Path:
         """Get the directory from file path."""
-        return str(Path(self.file_path).parent)
+        return self.file_path.parent
 
     def __repr__(self) -> str:
         """Human-readable representation for debugging."""

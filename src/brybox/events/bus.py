@@ -6,6 +6,8 @@ Thread-safe event dispatcher with topic-based subscriptions.
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime
+from os import PathLike
+from pathlib import Path
 from threading import Lock
 from typing import Any, TypeVar
 
@@ -104,19 +106,19 @@ event_bus = EventBus()
 
 
 # Convenience functions for common usage patterns
-def publish_file_moved(source_path: str, destination_path: str, file_size: int, is_healthy: bool) -> None:
+def publish_file_moved(source_path: PathLike, destination_path: PathLike, file_size: int, is_healthy: bool) -> None:
     """
     Convenience function to publish FileMovedEvent.
 
     Args:
-        source_path: Original file location
-        destination_path: New file location
+        source_path: Original file location (str or Path)
+        destination_path: New file location (str or Path)
         file_size: Size of the moved file in bytes
         is_healthy: Whether the file passed health checks
     """
     event = FileMovedEvent(
-        source_path=source_path,
-        destination_path=destination_path,
+        source_path=Path(source_path),
+        destination_path=Path(destination_path),
         file_size=file_size,
         is_healthy=is_healthy,
         timestamp=datetime.now(),
@@ -124,22 +126,26 @@ def publish_file_moved(source_path: str, destination_path: str, file_size: int, 
     event_bus.publish(event)
 
 
-def publish_file_deleted(file_path: str, file_size: int) -> None:
+def publish_file_deleted(file_path: PathLike, file_size: int) -> None:
     """
     Convenience function to publish FileDeletedEvent.
 
     Args:
-        file_path: Path of the file that was deleted
+        file_path: Path of the file that was deleted (str or Path)
         file_size: Size of the deleted file in bytes
     """
-    event = FileDeletedEvent(file_path=file_path, file_size=file_size, timestamp=datetime.now())
+    event = FileDeletedEvent(
+        file_path=Path(file_path),
+        file_size=file_size,
+        timestamp=datetime.now(),
+    )
     event_bus.publish(event)
 
 
 def publish_file_copied(
     *,
-    source_path: str,
-    destination_path: str,
+    source_path: PathLike,
+    destination_path: PathLike,
     source_size: int,
     destination_size: int,
     source_healthy: bool,
@@ -153,8 +159,8 @@ def publish_file_copied(
         - sizes are non-negative
     """
     event = FileCopiedEvent(
-        source_path=source_path,
-        destination_path=destination_path,
+        source_path=Path(source_path),
+        destination_path=Path(destination_path),
         source_size=source_size,
         destination_size=destination_size,
         source_healthy=source_healthy,
@@ -164,19 +170,19 @@ def publish_file_copied(
     event_bus.publish(event)
 
 
-def publish_file_renamed(old_path: str, new_path: str, file_size: int, is_healthy: bool) -> None:
+def publish_file_renamed(old_path: PathLike, new_path: PathLike, file_size: int, is_healthy: bool) -> None:
     """
     Publish a file renamed event.
 
     Args:
-        old_path: Original file path
-        new_path: New file path
+        old_path: Original file path (str or Path)
+        new_path: New file path (str or Path)
         file_size: Size of the file in bytes
         is_healthy: Whether the destination file passed health checks
     """
     event = FileRenamedEvent(
-        old_path=old_path,
-        new_path=new_path,
+        old_path=Path(old_path),
+        new_path=Path(new_path),
         file_size=file_size,
         destination_healthy=is_healthy,
         timestamp=datetime.now(),
@@ -184,17 +190,17 @@ def publish_file_renamed(old_path: str, new_path: str, file_size: int, is_health
     event_bus.publish(event)
 
 
-def publish_file_added(file_path: str, file_size: int, is_healthy: bool) -> None:
+def publish_file_added(file_path: PathLike, file_size: int, is_healthy: bool) -> None:
     """
     Convenience function to publish FileAddedEvent.
 
     Args:
-        file_path: Path of the newly added file
+        file_path: Path of the newly added file (str or Path)
         file_size: Size of the file in bytes
         is_healthy: Whether the file passed health checks
     """
     event = FileAddedEvent(
-        file_path=file_path,
+        file_path=Path(file_path),
         file_size=file_size,
         is_healthy=is_healthy,
         timestamp=datetime.now(),

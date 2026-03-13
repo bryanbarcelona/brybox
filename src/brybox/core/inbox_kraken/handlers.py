@@ -44,7 +44,7 @@ def download_pdf_handler(ctx: ProcessingContext) -> ProcessResult:
         r.raise_for_status()
 
         target_path.write_bytes(r.content)
-        publish_file_added(file_path=str(target_path), file_size=target_path.stat().st_size, is_healthy=True)
+        publish_file_added(file_path=target_path, file_size=target_path.stat().st_size, is_healthy=True)
 
         return ProcessResult(success=True, target_path=target_path, is_healthy=True, can_delete=True)
 
@@ -84,7 +84,7 @@ def download_attachment_handler(ctx: ProcessingContext) -> ProcessResult:
             target_path = save_path(f'{meta.uid}_{name}', save_dir)
             target_path.write_bytes(payload)
 
-            publish_file_added(file_path=str(target_path), file_size=target_path.stat().st_size, is_healthy=True)
+            publish_file_added(file_path=target_path, file_size=target_path.stat().st_size, is_healthy=True)
             last_saved_path = target_path
             any_success = True
 
@@ -103,9 +103,9 @@ def dropbox_audio_handler(ctx: ProcessingContext) -> ProcessResult:
 
     meta: EmailMeta = ctx.meta
     save_dir: Path = ctx.save_dir
-    print(meta)
+
     links = filter_audio_links(meta)
-    print(links)
+
     downloaded_count = 0
     errors = []
     target_path = None  # Safe default — avoids NameError if no AUDIO links are found
@@ -143,7 +143,7 @@ def dropbox_audio_handler(ctx: ProcessingContext) -> ProcessResult:
                     for chunk in dl_r.iter_content(chunk_size=8192):
                         f.write(chunk)
 
-                publish_file_added(str(target_path), target_path.stat().st_size, is_healthy=True)
+                publish_file_added(target_path, target_path.stat().st_size, is_healthy=True)
                 downloaded_count += 1
 
         except (requests.RequestException, InboxKrakenError) as e:
