@@ -22,7 +22,7 @@ class ProcessingContext:
     document_date: str | None = None
     invoice_id: str | None = None
     output_filename: str = ''
-    output_filepath: str = ''
+    output_filepath: Path = Path()
     is_new_file: bool = True
 
 

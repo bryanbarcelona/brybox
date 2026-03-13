@@ -231,10 +231,15 @@ class DoctopusPrimeNexus:
             else pdf_files
         )
 
-        results = {}
+        results: dict[str, dict[str, bool | str | None]] = {}
 
         for pdf_file in iterable:
-            result = {'success': False, 'processed': False, 'category': None, 'error': None}
+            result: dict[str, bool | str | None] = {
+                'success': False,
+                'processed': False,
+                'category': None,
+                'error': None,
+            }
 
             try:
                 processor = self.processor_class(

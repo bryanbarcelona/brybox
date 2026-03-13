@@ -60,7 +60,7 @@ class PathBuilder:
 
         # If file doesn't exist, we're done
         if not filepath.is_file():
-            return filepath
+            return Path(filepath)
 
         # Check if it's a duplicate
         try:
@@ -73,7 +73,7 @@ class PathBuilder:
             ) from e
         else:
             if is_duplicate:
-                return filepath
+                return Path(filepath)
 
         # Resolve conflict
         try:

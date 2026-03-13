@@ -9,6 +9,7 @@ from typing import Any
 
 import pdfplumber
 from dateutil import parser
+from pdfplumber.utils.exceptions import MalformedPDFException, PdfminerException
 
 from brybox.exceptions.documents import DoctopusPDFError, DoctopusPDFNotFoundError
 from brybox.utils.logging import get_configured_logger
@@ -36,7 +37,7 @@ class TextProcessor:
                 text = pdf.pages[0].extract_text()
                 return text or ''  # None becomes empty string, not an error
 
-        except pdfplumber.PDFSyntaxError as e:
+        except (MalformedPDFException, PdfminerException) as e:
             raise DoctopusPDFError(f'PDF is corrupted or invalid: {pdf_path}', pdf_path=pdf_path) from e
         except Exception as e:
             if 'password' in str(e).lower():
