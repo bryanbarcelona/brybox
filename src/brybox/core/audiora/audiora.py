@@ -237,7 +237,9 @@ class AudioraNexus:
         if not self.dir_path.exists():
             raise AudioraConfigurationError(f'Directory does not exist: {dir_path}', audio_path=dir_path)
 
-    def process_all(self, *, progress_bar: bool = True, file_extensions: list[str] | None = None) -> dict[str, bool]:
+    def process_all(
+        self, *, progress_bar: bool = True, file_extensions: list[str] | None = None
+    ) -> dict[Path, dict[str, bool | str | None]]:
         """
         Process all audio files in directory.
 
@@ -246,16 +248,21 @@ class AudioraNexus:
             file_extensions: List of file extensions to process (default: ['.m4a', '.mp3', '.flac', '.wav'])
 
         Returns:
-            Dict mapping file paths to success status
+            Dict mapping file paths to result dict with keys:
+                success: bool - True if no errors occurred
+                processed: bool - True if file was categorized and moved
+                category: str|None - Category if found
+                error: str|None - Error message if any
         """
         if file_extensions is None:
             file_extensions = ['.m4a', '.mp3', '.flac', '.wav']
 
         audio_files = []
         for ext in file_extensions:
-            audio_files.extend(Path(self.dir_path).glob(f'*{ext}'))
+            audio_files.extend(self.dir_path.glob(f'*{ext}'))
 
-        results = {}
+        # Use Path as dictionary key
+        results: dict[Path, dict[str, bool | str | None]] = {}
 
         log_and_display(f'Processing {len(audio_files)} audio file(s) in {self.dir_path}', sticky=True)
         audio_files = (
@@ -265,11 +272,17 @@ class AudioraNexus:
         )
 
         for audio_file in audio_files:
-            result = {'success': False, 'processed': False, 'category': None, 'error': None}
+            # Initialize with proper types
+            result: dict[str, bool | str | None] = {
+                'success': False,
+                'processed': False,
+                'category': None,
+                'error': None,
+            }
 
             try:
                 processor = self.processor_class(
-                    audio_filepath=str(audio_file),
+                    audio_filepath=audio_file,  # Pass Path directly
                     base_dir=self.base_dir,
                     config=self.config,
                     dry_run=self.dry_run,
@@ -289,7 +302,7 @@ class AudioraNexus:
                 log_and_display(f'💥 Unexpected error for {audio_file.name}: {e}', level='error')
 
             finally:
-                results[str(audio_file)] = result
+                results[audio_file] = result  # Use Path as key directly
 
         # Summary
         successful = sum(1 for r in results.values() if r['success'])

@@ -23,7 +23,7 @@ class AudioMetadataExtractor:
     def __init__(self):
         pass
 
-    def extract_media_created_date(self, file_path: str) -> str | None:
+    def extract_media_created_date(self, file_path: str | Path) -> str | None:
         """
         Extract Media Created date from audio file metadata.
 
