@@ -91,7 +91,6 @@ class MetadataWriter:
             raise VideoSithMetadataWriteError(
                 f'Setting creation date timed out after 30s for {file_path.name}',
                 video_path=file_path,
-                timeout_seconds=30,
             ) from e
         except (OSError, PermissionError) as e:
             raise VideoSithFileOperationError(
@@ -149,7 +148,6 @@ class MetadataWriter:
             raise VideoSithMetadataWriteError(
                 f'Setting GPS coordinates timed out after 30s for {file_path.name}',
                 video_path=file_path,
-                timeout_seconds=30,
             ) from e
         except (OSError, PermissionError) as e:
             raise VideoSithFileOperationError(

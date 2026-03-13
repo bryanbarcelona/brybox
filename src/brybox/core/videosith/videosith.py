@@ -64,6 +64,12 @@ class VideoSith:
         self._metadata: VideoMetadata | None = None
         self._is_healthy: bool = False
 
+    def _ensure_file_path(self) -> Path:
+        """Ensure file_path is set and return it."""
+        if self._file_path is None:
+            raise VideoSithFileOperationError('No file opened. Call open() first.')
+        return self._file_path
+
     def open(self, file_path: Path) -> None:
         """
         Open file for processing.
@@ -93,50 +99,52 @@ class VideoSith:
                 success=False, target_path=Path(), is_healthy=False, error_message='Must call open() before process()'
             )
 
+        file_path = self._ensure_file_path()
+
         # Delete Apple sidecars before processing
         try:
-            self._sidecar_manager.delete_sidecars(self._file_path)
+            self._sidecar_manager.delete_sidecars(file_path)
         except (OSError, PermissionError, FileNotFoundError) as e:
             log_and_display(f'⚠️ Failed to delete sidecars: {e}', level='warning', log=True)
             # Non-fatal - continue
 
         # Route based on file type - clean separation
-        if self._file_path.suffix.lower() == '.mov':
+        if file_path.suffix.lower() == '.mov':
             return self._process_mov()
         else:
             return self._process_mp4()
 
     def _process_mov(self) -> ProcessResult:
         """Process MOV file: convert to MP4 and rename."""
-        original_path = self._file_path
-        original_size = original_path.stat().st_size if original_path.exists() else 0
+        file_path = self._ensure_file_path()
+        original_size = file_path.stat().st_size if file_path.exists() else 0
 
         try:
             # Step 1: Extract metadata from source
             try:
-                self._metadata = self._metadata_reader.extract_metadata(original_path)
-                log_and_display(f'📷 Extracted metadata from {original_path.name}', log=False)
+                self._metadata = self._metadata_reader.extract_metadata(file_path)
+                log_and_display(f'📷 Extracted metadata from {file_path.name}', log=False)
             except VideoSithMetadataReadError as e:
-                log_and_display(f'❌ Failed to read metadata from {original_path.name}: {e}', level='error')
-                return ProcessResult(success=False, target_path=original_path, is_healthy=False, error_message=str(e))
+                log_and_display(f'❌ Failed to read metadata from {file_path.name}: {e}', level='error')
+                return ProcessResult(success=False, target_path=file_path, is_healthy=False, error_message=str(e))
             except VideoSithMetadataParseError as e:
-                log_and_display(f'⚠️ Partial metadata for {original_path.name}: {e}', level='warning')
+                log_and_display(f'⚠️ Partial metadata for {file_path.name}: {e}', level='warning')
                 self._metadata = VideoMetadata()  # Empty metadata
 
             # Step 2: Generate target path
             target_path = PathStrategy.generate_target_path(
-                original_path,
+                file_path,
                 self._metadata.creation_date if self._metadata else None,
                 self._metadata.time_offset if self._metadata else None,
             )
 
             # Step 3: Convert to MP4
             try:
-                self._converter.convert_to_mp4(original_path, target_path)
-                log_and_display(f'🎬 Converted {original_path.name} to {target_path.name}')
+                self._converter.convert_to_mp4(file_path, target_path)
+                log_and_display(f'🎬 Converted {file_path.name} to {target_path.name}')
             except VideoSithConversionError as e:
                 log_and_display(f'❌ Conversion failed: {e}', level='error')
-                return ProcessResult(success=False, target_path=original_path, is_healthy=False, error_message=str(e))
+                return ProcessResult(success=False, target_path=file_path, is_healthy=False, error_message=str(e))
 
             # Step 4: Write metadata to new MP4
             self._write_metadata_to_file(target_path)
@@ -147,24 +155,24 @@ class VideoSith:
 
             # Step 6: Delete original MOV
             try:
-                original_path.unlink()
-                log_and_display(f'🗑️ Deleted original: {original_path.name}')
-                publish_file_deleted(str(original_path), original_size)
+                file_path.unlink()
+                log_and_display(f'🗑️ Deleted original: {file_path.name}')
+                publish_file_deleted(file_path, original_size)
             except (OSError, PermissionError) as e:
                 log_and_display(f'⚠️ Failed to delete original: {e}', level='warning')
                 # Non-fatal - continue
 
             # Step 7: Clean up Apple sidecars
             try:
-                self._sidecar_manager.delete_sidecars(original_path)
+                self._sidecar_manager.delete_sidecars(file_path)
             except (OSError, PermissionError, FileNotFoundError) as e:
                 log_and_display(f'⚠️ Failed to delete sidecars: {e}', level='warning', log=True)
                 # Non-fatal - continue
 
             # Step 8: Publish rename event (original → target)
             publish_file_renamed(
-                old_path=str(original_path),
-                new_path=str(target_path),
+                old_path=file_path,
+                new_path=target_path,
                 file_size=target_path.stat().st_size,
                 is_healthy=self._is_healthy,
             )
@@ -174,35 +182,34 @@ class VideoSith:
 
         except VideoSithError as e:
             # Expected domain errors - already logged at point of occurrence
-            return ProcessResult(success=False, target_path=original_path, is_healthy=False, error_message=str(e))
+            return ProcessResult(success=False, target_path=file_path, is_healthy=False, error_message=str(e))
         except Exception as e:  # noqa: BLE001
             # Unexpected errors - log with traceback
-            log_and_display(f'💥 Unexpected error processing {original_path.name}: {e}', level='error')
-
+            log_and_display(f'💥 Unexpected error processing {file_path.name}: {e}', level='error')
             traceback.print_exc()
             return ProcessResult(
-                success=False, target_path=original_path, is_healthy=False, error_message=f'Unexpected error: {e}'
+                success=False, target_path=file_path, is_healthy=False, error_message=f'Unexpected error: {e}'
             )
 
     def _process_mp4(self) -> ProcessResult:
         """Process MP4 file: rename based on metadata."""
-        original_path = self._file_path
+        file_path = self._ensure_file_path()
 
         try:
             # Step 1: Extract metadata
             try:
-                self._metadata = self._metadata_reader.extract_metadata(original_path)
-                log_and_display(f'📷 Extracted metadata from {original_path.name}', log=False)
+                self._metadata = self._metadata_reader.extract_metadata(file_path)
+                log_and_display(f'📷 Extracted metadata from {file_path.name}', log=False)
             except VideoSithMetadataReadError as e:
-                log_and_display(f'❌ Failed to read metadata from {original_path.name}: {e}', level='error')
-                return ProcessResult(success=False, target_path=original_path, is_healthy=False, error_message=str(e))
+                log_and_display(f'❌ Failed to read metadata from {file_path.name}: {e}', level='error')
+                return ProcessResult(success=False, target_path=file_path, is_healthy=False, error_message=str(e))
             except VideoSithMetadataParseError as e:
-                log_and_display(f'⚠️ Partial metadata for {original_path.name}: {e}', level='warning')
+                log_and_display(f'⚠️ Partial metadata for {file_path.name}: {e}', level='warning')
                 self._metadata = VideoMetadata()  # Empty metadata
 
             # Step 2: Generate target path
             target_path = PathStrategy.generate_target_path(
-                original_path,
+                file_path,
                 self._metadata.creation_date if self._metadata else None,
                 self._metadata.time_offset if self._metadata else None,
             )
@@ -212,14 +219,14 @@ class VideoSith:
             self._is_healthy = True  # Match old behavior until video health check exists
 
             # Step 4: Rename if different
-            if original_path != target_path:
+            if file_path != target_path:
                 try:
-                    original_path.rename(target_path)
+                    file_path.rename(target_path)
                     log_and_display(f'📁 Renamed to {target_path.name}')
 
                     publish_file_renamed(
-                        old_path=str(original_path),
-                        new_path=str(target_path),
+                        old_path=file_path,
+                        new_path=target_path,
                         file_size=target_path.stat().st_size,
                         is_healthy=self._is_healthy,
                     )
@@ -228,36 +235,33 @@ class VideoSith:
                 except (OSError, PermissionError) as e:
                     log_and_display(f'❌ Failed to rename: {e}', level='error')
                     return ProcessResult(
-                        success=False, target_path=original_path, is_healthy=False, error_message=f'Rename failed: {e}'
+                        success=False, target_path=file_path, is_healthy=False, error_message=f'Rename failed: {e}'
                     )
             else:
-                log_and_display(f'No rename needed for {original_path.name}', log=False)
-                self._file_path = original_path
+                log_and_display(f'No rename needed for {file_path.name}', log=False)
 
             # Step 5: Write metadata
-            self._write_metadata_to_file(self._file_path)
+            current_path = self._ensure_file_path()
+            self._write_metadata_to_file(current_path)
 
             # Step 6: Clean up Apple sidecars
             try:
-                self._sidecar_manager.delete_sidecars(self._file_path)
+                self._sidecar_manager.delete_sidecars(current_path)
             except (OSError, PermissionError, FileNotFoundError) as e:
                 log_and_display(f'⚠️ Failed to delete sidecars: {e}', level='warning', log=True)
                 # Non-fatal - continue
 
-            return ProcessResult(
-                success=True, target_path=self._file_path, is_healthy=self._is_healthy, error_message=''
-            )
+            return ProcessResult(success=True, target_path=current_path, is_healthy=self._is_healthy, error_message='')
 
         except VideoSithError as e:
             # Expected domain errors - already logged
-            return ProcessResult(success=False, target_path=original_path, is_healthy=False, error_message=str(e))
+            return ProcessResult(success=False, target_path=file_path, is_healthy=False, error_message=str(e))
         except Exception as e:  # noqa: BLE001
             # Unexpected errors - log with traceback
-            log_and_display(f'💥 Unexpected error processing {original_path.name}: {e}', level='error')
-
+            log_and_display(f'💥 Unexpected error processing {file_path.name}: {e}', level='error')
             traceback.print_exc()
             return ProcessResult(
-                success=False, target_path=original_path, is_healthy=False, error_message=f'Unexpected error: {e}'
+                success=False, target_path=file_path, is_healthy=False, error_message=f'Unexpected error: {e}'
             )
 
     def _write_metadata_to_file(self, file_path: Path) -> None:
