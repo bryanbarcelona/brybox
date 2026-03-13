@@ -102,7 +102,7 @@ class TechemScraper(BaseScraper):
             file_size = Path(output_path).stat().st_size
 
             publish_file_added(
-                file_path=str(output_path),
+                file_path=output_path,
                 file_size=file_size,
                 is_healthy=True,
             )

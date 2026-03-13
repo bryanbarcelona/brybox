@@ -229,7 +229,7 @@ class KfwScraper(BaseScraper):
             file_size = Path(output_path).stat().st_size
             is_healthy = is_pdf_healthy(output_path)
 
-            publish_file_added(file_path=str(output_path), file_size=file_size, is_healthy=is_healthy)
+            publish_file_added(file_path=output_path, file_size=file_size, is_healthy=is_healthy)
 
             log_and_display(f'Downloaded: {filename} ({len(response.body())} bytes)', log=True, sticky=False)
             return True
