@@ -44,11 +44,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev --frozen
 
-      # - name: Lint & format
-      #   run: uvx ruff check . && uvx ruff format . --check
+      - name: Lint & format
+        run: uvx ruff check . && uvx ruff format . --check
 
-      # - name: Type check
-      #   run: uvx ty check .
+      - name: Type check
+        run: uvx ty check .
 
       - name: Check for tests
         id: check_tests
