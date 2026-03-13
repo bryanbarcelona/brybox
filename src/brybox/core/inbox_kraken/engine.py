@@ -126,13 +126,16 @@ class InboxKraken:
             log_and_display(f'[IGNORE] UID: {uid} | {meta.sender[:25]:<25} | Not in rules.')
             return
 
-        meta, msg_obj = self.fetcher.get_full_message(uid)
+        full_meta, msg_obj = self.fetcher.get_full_message(uid)
+        if not full_meta or not msg_obj:
+            log_and_display(f'[ERROR] UID: {uid} | Failed to fetch full message content')
+            return
 
         # C. INITIAL CLASSIFY (Check for early actions like DELETE)
-        tag = self.classifier.classify(meta)
+        tag = self.classifier.classify(full_meta)
 
         # LOG the found match
-        log_msg = f'[{tag.name}] UID: {uid} | {meta.sender[:25]:<25} | {meta.subject[:45]:<45}'
+        log_msg = f'[{tag.name}] UID: {uid} | {full_meta.sender[:25]:<25} | {full_meta.subject[:45]:<45}'
         log_and_display(log_msg)
 
         if tag == Tag.DELETE:
@@ -143,7 +146,7 @@ class InboxKraken:
             return
 
         # E. EXECUTE HANDLER
-        result = self._execute_handler(tag, meta, msg_obj)
+        result = self._execute_handler(tag, full_meta, msg_obj)
         if result and result.success and result.can_delete:
             self._cleanup_email(uid)
 

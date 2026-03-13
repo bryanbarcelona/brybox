@@ -3,10 +3,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
-from bs4 import BeautifulSoup
 
 from brybox.core.inbox_kraken.helpers import classify_link, get_dropbox_download_link, resolve_redirected_url, save_path
-from brybox.core.models.email import ProcessingContext, ProcessResult
+from brybox.core.models.email import EmailMeta, ProcessingContext, ProcessResult
 from brybox.core.web_marionette.kfw import KfwScraper
 from brybox.core.web_marionette.techem import TechemScraper
 from brybox.events.bus import publish_file_added
@@ -25,6 +24,7 @@ from brybox.exceptions.scrapers import (
     ScraperError,
     ScraperNavigationError,
 )
+from brybox.utils.credentials import WebCredentials
 from brybox.utils.logging import log_and_display
 from brybox.utils.specialized_tools import filter_audio_links
 
@@ -78,7 +78,7 @@ def download_attachment_handler(ctx: ProcessingContext) -> ProcessResult:
         name = part.get_filename()
         if name and name.lower().endswith('.pdf') and part.get_content_disposition() == 'attachment':
             payload = part.get_payload(decode=True)
-            if not payload:
+            if not payload or not isinstance(payload, bytes):
                 continue
 
             target_path = save_path(f'{meta.uid}_{name}', save_dir)
@@ -101,19 +101,11 @@ def download_attachment_handler(ctx: ProcessingContext) -> ProcessResult:
 
 def dropbox_audio_handler(ctx: ProcessingContext) -> ProcessResult:
 
-    meta = ctx.meta
-    save_dir = ctx.save_dir
-
-    soup = BeautifulSoup(meta.body_html, 'html.parser')
-
-    links = [
-        {'url': a['href'], 'text': a.get_text(strip=True)}
-        for a in soup.find_all('a', href=True)
-        if a['href'].startswith('http')
-    ]
-
-    links = filter_audio_links(links)
-
+    meta: EmailMeta = ctx.meta
+    save_dir: Path = ctx.save_dir
+    print(meta)
+    links = filter_audio_links(meta)
+    print(links)
     downloaded_count = 0
     errors = []
     target_path = None  # Safe default — avoids NameError if no AUDIO links are found
@@ -176,13 +168,23 @@ def dropbox_audio_handler(ctx: ProcessingContext) -> ProcessResult:
 
 
 def techem_handler(ctx: ProcessingContext) -> ProcessResult:
-    creds = ctx.creds
-    if creds is None or not creds.techem_user or not creds.techem_password:
-        raise InboxKrakenOperationFailedError('Missing Techem credentials')
+    creds: WebCredentials | None = ctx.creds
+    if creds is None:
+        raise InboxKrakenOperationFailedError('Missing credentials object')
+
+    # Validate Techem credentials are strings
+    techem_user = creds.techem_user
+    techem_password = creds.techem_password
+
+    if not isinstance(techem_user, str) or not techem_user:
+        raise InboxKrakenOperationFailedError('Missing or invalid Techem username')
+
+    if not isinstance(techem_password, str) or not techem_password:
+        raise InboxKrakenOperationFailedError('Missing or invalid Techem password')
 
     try:
         scraper = TechemScraper(
-            username=creds.techem_user, password=creds.techem_password, download_dir=str(ctx.save_dir), headless=False
+            username=techem_user, password=techem_password, download_dir=str(ctx.save_dir), headless=False
         )
         result = scraper.download()
 
@@ -213,14 +215,21 @@ def techem_handler(ctx: ProcessingContext) -> ProcessResult:
 
 
 def kfw_handler(ctx: ProcessingContext) -> ProcessResult:
-    creds = ctx.creds
-    if creds is None or not creds.techem_user or not creds.techem_password:
-        raise InboxKrakenConfigurationError('Missing KfW credentials', config_key='kfw_credentials')
+    creds: WebCredentials | None = ctx.creds
+    if creds is None:
+        raise InboxKrakenConfigurationError('Missing credentials object', config_key='credentials')
+
+    kfw_user = creds.kfw_user
+    kfw_password = creds.kfw_password
+
+    if not isinstance(kfw_user, str) or not kfw_user:
+        raise InboxKrakenConfigurationError('Missing or invalid KfW username', config_key='kfw_username')
+
+    if not isinstance(kfw_password, str) or not kfw_password:
+        raise InboxKrakenConfigurationError('Missing or invalid KfW password', config_key='kfw_password')
 
     try:
-        scraper = KfwScraper(
-            username=creds.kfw_user, password=creds.kfw_password, download_dir=str(ctx.save_dir), headless=True
-        )
+        scraper = KfwScraper(username=kfw_user, password=kfw_password, download_dir=str(ctx.save_dir), headless=True)
         result = scraper.download()
 
         if not result or result.downloaded == 0:

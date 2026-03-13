@@ -13,7 +13,7 @@ from brybox.exceptions.emails import (
 
 class EmailFetcher:
     def __init__(self, mail_conn: imaplib.IMAP4_SSL):
-        self.mail = mail_conn
+        self.mail: imaplib.IMAP4_SSL = mail_conn
 
     def fetch_uids(
         self,
@@ -27,7 +27,7 @@ class EmailFetcher:
             return sorted([int(u) for u in only_uids])
 
         try:
-            typ, data = self.mail.uid('SEARCH', None, 'ALL')
+            typ, data = self.mail.uid('SEARCH', 'ALL')
         except TimeoutError as e:
             raise InboxKrakenTimeoutError('IMAP search timed out', error_detail=str(e)) from e
         except (imaplib.IMAP4.error, OSError) as e:
@@ -82,11 +82,14 @@ class EmailFetcher:
         body_html = ''
         for part in msg.walk():
             if part.get_content_type() == 'text/html' and not part.get_filename():
-                body_html = part.get_payload(decode=True).decode(errors='ignore')
+                payload = part.get_payload(decode=True)
+                if isinstance(payload, bytes):
+                    body_html = payload.decode(errors='ignore')
                 break
 
-        attachments = [p.get_filename() for p in msg.walk() if p.get_filename()]
-        link = extract_invoice_link(body_html)
+        attachments: list[str | None] = [p.get_filename() for p in msg.walk() if p.get_filename()]
+        attachments: list[str] = [f for f in attachments if f is not None]  # Remove None values
+        link: str | None = extract_invoice_link(body_html)
 
         meta = EmailMeta(
             uid=uid,

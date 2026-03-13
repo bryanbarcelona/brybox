@@ -3,7 +3,7 @@ from email.header import decode_header
 from pathlib import Path
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from brybox.exceptions.emails import (
     InboxKrakenConfigurationError,
@@ -120,11 +120,26 @@ def extract_invoice_link(html: str) -> str | None:
         return None
     soup = BeautifulSoup(html, 'html.parser')
     for a in soup.find_all('a', href=True):
+        if not isinstance(a, Tag):
+            continue
+
+        href_attr = a.get('href')
+        if href_attr is None:
+            continue
+
+        if isinstance(href_attr, list):
+            href_value = next((str(v) for v in href_attr if isinstance(v, str)), None)
+            if href_value is None:
+                continue
+        else:
+            href_value = str(href_attr)
+
+        href_lower = href_value.lower()
         text = a.get_text(strip=True).lower()
-        href = a['href'].lower()
-        # Keywords for matching
-        if any(k in text or k in href for k in ('invoice', 'receipt', 'rechnung', 'beleg')):
-            return a['href']
+
+        if any(k in text or k in href_lower for k in ('invoice', 'receipt', 'rechnung', 'beleg')):
+            return href_value
+
     return None
 
 

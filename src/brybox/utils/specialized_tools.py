@@ -1,3 +1,7 @@
+from bs4 import BeautifulSoup, Tag
+
+from brybox.core.models.email import EmailMeta
+
 EXCLUDED_LINK_TEXT = [
     'browser',
     'click',
@@ -20,7 +24,15 @@ EXCLUDED_LINK_TEXT = [
 ]
 
 
-def filter_audio_links(links: list[dict[str, str]]) -> list[str]:
+def filter_audio_links(meta: EmailMeta) -> list[str]:
+
+    soup = BeautifulSoup(meta.body_html, 'html.parser')
+    links = []
+    for a in soup.find_all('a', href=True):
+        if not isinstance(a, Tag):
+            continue
+        href = a.get('href', '')
+        links.append({'url': href, 'text': a.get_text(strip=True)})
 
     return [
         link['url']
