@@ -43,8 +43,8 @@ def _handle_processor_result(
 
     # Success - publish rename event
     publish_file_renamed(
-        old_path=str(temp_image_path),
-        new_path=str(process_result.target_path),
+        old_path=temp_image_path,
+        new_path=process_result.target_path,
         file_size=process_result.target_path.stat().st_size,
         is_healthy=process_result.is_healthy,
     )

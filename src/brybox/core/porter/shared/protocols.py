@@ -51,9 +51,17 @@ class FileFilter(Protocol):
 class MetadataFixer(Protocol):
     """Interface for fixing metadata of files."""
 
-    def fix_metadata(
-        self, mappings: list[tuple[Path, Path, list[Path]]], dry_run: bool, action_prefix: str
-    ) -> None: ...
+    def fix_metadata(self, mappings: list[tuple[Path, Path, list[Path]]]) -> int:
+        """
+        Fix metadata for files.
+
+        Args:
+            mappings: List of (source_path, temp_image_path, temp_sidecar_paths)
+
+        Returns:
+            Number of changes made (e.g., timestamps adjusted)
+        """
+        ...
 
 
 class Deduplicator(Protocol):

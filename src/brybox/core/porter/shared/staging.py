@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from brybox.utils.apple_files import SidecarRename
 
 
-def _generate_temp_name(original_path: Path) -> str:
+def _generate_temp_name(original_path: Path) -> Path:
     """Generate collision-safe temporary filename."""
     timestamp = int(time.time() * 1000)
     rand_suffix = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(8))
@@ -61,8 +61,8 @@ def _copy_single_sidecar(rename: SidecarRename, target: Path, temp_sidecar_paths
 
     # Publish event
     publish_file_copied(
-        source_path=str(rename.original),
-        destination_path=str(target_path),
+        source_path=rename.original,
+        destination_path=target_path,
         source_size=rename.original.stat().st_size,
         destination_size=target_path.stat().st_size,
         source_healthy=is_healthy(rename.original),
@@ -103,8 +103,8 @@ def _copy_main_image(file_path: Path, temp_image_path: Path) -> None:
 
     # Publish event
     publish_file_copied(
-        source_path=str(file_path),
-        destination_path=str(temp_image_path),
+        source_path=file_path,
+        destination_path=temp_image_path,
         source_size=file_path.stat().st_size,
         destination_size=temp_image_path.stat().st_size,
         source_healthy=is_healthy(file_path),

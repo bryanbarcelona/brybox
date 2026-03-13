@@ -11,13 +11,12 @@ def _delete_duplicate_file(dup_path: Path) -> None:
     try:
         file_size = dup_path.stat().st_size
         dup_path.unlink()
-        publish_file_deleted(str(dup_path), file_size)
+        publish_file_deleted(dup_path, file_size)
     except OSError as e:
         raise PorterFileOperationError(
             f'Failed to delete duplicate file: {dup_path}',
             source_path=dup_path,
             operation='delete',
-            error_detail=str(e),
         ) from e
 
 
@@ -30,13 +29,12 @@ def _delete_sidecars(sidecar_paths: list[Path]) -> None:
         try:
             sidecar_size = sidecar.stat().st_size
             sidecar.unlink()
-            publish_file_deleted(str(sidecar), sidecar_size)
+            publish_file_deleted(sidecar, sidecar_size)
         except OSError as e:
             raise PorterFileOperationError(
                 f'Failed to delete sidecar for duplicate: {sidecar}',
                 source_path=sidecar,
                 operation='delete',
-                error_detail=str(e),
             ) from e
 
 
