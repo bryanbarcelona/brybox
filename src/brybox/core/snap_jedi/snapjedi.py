@@ -59,6 +59,7 @@ class SnapJedi:
         self._sidecar_manager = sidecar_manager or AppleSidecarManager
 
         self._file_path: Path | None = None
+        self._target_path: Path | None = None
         self._metadata: ImageMetadata | None = None
         self._is_healthy: bool = False
 
@@ -85,6 +86,18 @@ class SnapJedi:
 
         self._file_path = file_path
         log_and_display(f'Opened file: {file_path.name}', log=False)
+
+    def _ensure_file_path(self) -> Path:
+        """Ensure file_path is set and return it."""
+        if self._file_path is None:
+            raise SnapJediFileOperationError('No file opened. Call open() first.')
+        return self._file_path
+
+    def _ensure_target_path(self) -> Path:
+        """Ensure target_path is set and return it."""
+        if self._target_path is None:
+            raise SnapJediFileOperationError('Target path not set.')
+        return self._target_path
 
     def process(self) -> ProcessResult:
         """Execute full processing pipeline."""
@@ -130,6 +143,7 @@ class SnapJedi:
 
     def _execute_post_conversion_steps(self) -> ProcessResult:
         """Execute steps after conversion: duplicate handling, rename, cleanup."""
+
         # Step 5 & 6: Generate target path and handle duplicates
         duplicate_result = self._generate_and_check_duplicate()
         if duplicate_result:
@@ -140,74 +154,80 @@ class SnapJedi:
 
     def _extract_metadata(self) -> ProcessResult | None:
         """Extract metadata, returning ProcessResult on failure or None on success."""
+        file_path = self._ensure_file_path()
+
         try:
-            self._metadata = self._metadata_reader.extract_metadata(self._file_path)
+            self._metadata = self._metadata_reader.extract_metadata(file_path)
         except SnapJediImageNotFoundError:
             return ProcessResult(
                 success=False,
-                target_path=self._file_path,
+                target_path=file_path,
                 is_healthy=False,
-                error_message=f'Image file disappeared: {self._file_path.name}',
+                error_message=f'Image file disappeared: {file_path.name}',
             )
         except SnapJediMetadataReadError as e:
-            log_and_display(f'📄 Failed to read metadata from {self._file_path.name}', level='warning')
+            log_and_display(f'📄 Failed to read metadata from {file_path.name}', level='warning')
             return ProcessResult(
                 success=False,
-                target_path=self._file_path,
+                target_path=file_path,
                 is_healthy=False,
                 error_message=f'Metadata read failed: {e}',
             )
         except SnapJediMetadataParseError as e:
-            log_and_display(f'⚠️  Could not parse {e.field} from {self._file_path.name}', level='warning')
+            log_and_display(f'⚠️  Could not parse {e.field} from {file_path.name}', level='warning')
             return None  # Continue with partial metadata
         except SnapJediMetadataError as e:
-            log_and_display(f'📄 Metadata error for {self._file_path.name}: {e}', level='warning')
-            return ProcessResult(success=False, target_path=self._file_path, is_healthy=False, error_message=str(e))
+            log_and_display(f'📄 Metadata error for {file_path.name}: {e}', level='warning')
+            return ProcessResult(success=False, target_path=file_path, is_healthy=False, error_message=str(e))
         else:  # This runs only if no exception occurred
-            log_and_display(f'📷 Read metadata from {self._file_path.name}', log=False)
+            log_and_display(f'📷 Read metadata from {file_path.name}', log=False)
             return None
 
     def _handle_conversion_if_needed(self) -> ProcessResult | None:
         """Handle HEIC to JPG conversion if needed."""
-        if self._file_path.suffix.lower() not in {'.heic', '.heif'}:
+        file_path = self._ensure_file_path()
+
+        if file_path.suffix.lower() not in {'.heic', '.heif'}:
             return None
 
-        jpg_path = self._file_path.with_suffix('.jpg')
-        return self._handle_conversion(self._file_path, jpg_path)
+        jpg_path = file_path.with_suffix('.jpg')
+        return self._handle_conversion(file_path, jpg_path)
 
     def _generate_and_check_duplicate(self) -> ProcessResult | None:
         """Generate target path and handle duplicates."""
+        file_path = self._ensure_file_path()
+
+        creation_date = self._metadata.creation_date if self._metadata else None
+        time_offset = self._metadata.time_offset if self._metadata else None
+
         target_path = PathStrategy.generate_target_path(
-            self._file_path,
-            self._metadata.creation_date if self._metadata else None,
-            self._metadata.time_offset if self._metadata else None,
+            file_path,
+            creation_date,
+            time_offset,
         )
 
         self._target_path = target_path
 
-        if (
-            target_path.exists()
-            and target_path != self._file_path
-            and self._are_files_identical(self._file_path, target_path)
-        ):
-            return self._handle_duplicate(self._file_path, target_path)
+        if target_path.exists() and target_path != file_path and self._are_files_identical(file_path, target_path):
+            return self._handle_duplicate(file_path, target_path)
 
         return None
 
     def _finalize_processing(self) -> ProcessResult:
         """Rename file, verify health, publish event, and clean up sidecars."""
-        target_path = self._target_path
+        file_path = self._ensure_file_path()
+        target_path = self._ensure_target_path()
 
-        if self._file_path != target_path:
+        if file_path != target_path:
             try:
-                self._file_path.rename(target_path)
+                file_path.rename(target_path)
                 log_and_display(f'📁 Renamed to {target_path.name}')
 
                 self._is_healthy = is_image_healthy(target_path)
 
                 publish_file_renamed(
-                    old_path=str(self._file_path),
-                    new_path=str(target_path),
+                    old_path=file_path,
+                    new_path=target_path,
                     file_size=target_path.stat().st_size,
                     is_healthy=self._is_healthy,
                 )
@@ -215,19 +235,20 @@ class SnapJedi:
                 self._file_path = target_path
 
             except (PermissionError, OSError) as e:
-                log_and_display(f'💾 Failed to rename {self._file_path.name}: {e}', level='error')
+                log_and_display(f'💾 Failed to rename {file_path.name}: {e}', level='error')
                 return ProcessResult(
                     success=False,
-                    target_path=self._file_path,
+                    target_path=file_path,
                     is_healthy=False,
                     error_message=f'Rename failed: {e}',
                 )
         else:
-            self._is_healthy = is_image_healthy(self._file_path)
-            log_and_display(f'✅ No rename needed for {self._file_path.name}')
+            self._is_healthy = is_image_healthy(file_path)
+            log_and_display(f'✅ No rename needed for {file_path.name}')
 
-        # Delete sidecars after rename
-        self._sidecar_manager.delete_sidecars(self._file_path)
+        # Delete sidecars after rename - use the current file path which is guaranteed to be set
+        current_path = self._ensure_file_path()
+        self._sidecar_manager.delete_sidecars(current_path)
 
         return ProcessResult(success=True, target_path=target_path, is_healthy=self._is_healthy, error_message='')
 
@@ -243,7 +264,7 @@ class SnapJedi:
                 self._file_path = target
                 original_heic_size = original_heic.stat().st_size
                 original_heic.unlink()
-                publish_file_deleted(str(original_heic), original_heic_size)
+                publish_file_deleted(original_heic, original_heic_size)
                 log_and_display(f'🗑️ Deleted original HEIC: {original_heic.name}')
                 return ProcessResult(success=True, target_path=target, is_healthy=True, error_message='')
             else:
@@ -279,7 +300,7 @@ class SnapJedi:
         try:
             source_size = source.stat().st_size
             source.unlink()
-            publish_file_deleted(str(source), source_size)
+            publish_file_deleted(source, source_size)
             log_and_display(f'🔄 Duplicate detected, deleted source: {source.name}')
 
             self._is_healthy = is_image_healthy(existing_target)
