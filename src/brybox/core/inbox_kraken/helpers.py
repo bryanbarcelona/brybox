@@ -42,14 +42,14 @@ RESERVED_NAMES = {
 # --- 1. RESOLUTION HELPERS ---
 
 
-def resolve_redirected_url(url: str) -> str:
+def resolve_redirected_url(url: str, session: requests.Session | None = None) -> str:
     """
     Unmasks tracking URLs (mlsend, bitly, etc.) to find the real destination.
     Uses stream=True to trigger redirects without downloading file bodies.
     """
+    requester = session if session is not None else requests
     try:
-        # HEAD is often ignored by trackers; GET with stream=True is the reliable way.
-        with requests.get(url, allow_redirects=True, timeout=10, stream=True) as r:
+        with requester.get(url, allow_redirects=True, timeout=10, stream=True) as r:
             return r.url
     except requests.Timeout as e:
         raise InboxKrakenTimeoutError(f'Redirection check timed out for {url}', resource_path=url) from e
@@ -57,18 +57,6 @@ def resolve_redirected_url(url: str) -> str:
         raise InboxKrakenNetworkError(
             f'Failed to connect to resolution server for {url}', resource_path=url, error_detail=str(e)
         ) from e
-
-
-def get_dropbox_download_link(url: str) -> str:
-    """Converts a Dropbox share link (viewing page) to a direct download stream."""
-    if 'dropbox.com' not in url.lower():
-        return url
-
-    # Force the dl=1 parameter
-    direct_url = url.replace('dl=0', 'dl=1')
-    if '?dl=1' not in direct_url:
-        direct_url += '&dl=1' if '?' in direct_url else '?dl=1'
-    return direct_url
 
 
 # --- 2. CLASSIFICATION HELPERS ---
