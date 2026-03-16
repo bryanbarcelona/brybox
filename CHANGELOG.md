@@ -1,3 +1,27 @@
+## v0.8.0 (2026-03-13)
+
+### Feat
+
+- **events**: migrate core event system to use Path objects
+
+### Fix
+
+- **inbox-kraken**: resolve type safety issues in email processing
+- **inbox-kraken**: filter empty and integer labels in breathwork links
+
+### Refactor
+
+- **utils**: resolve type safety issues across utility modules
+- **web-marionette**: update event bus calls to use Path objects
+- **video-sith**: resolve type safety issues and align with Path-based event system
+- **snap-jedi**: resolve type safety issues and align with Path-based event system
+- **porter**: migrate to Path objects and align with event system
+- **audiora**: resolve type safety issues and migrate to Path objects
+- **doctopus**: resolve type safety issues across PDF processing pipeline
+- **events**: clean up linting violations in event bus
+- **porter**: implement three-tier exception handling across all modules
+- **logging**: relocate configure_logging to package and expose via __init__
+
 ## v0.7.3 (2026-03-12)
 
 ### Fix
