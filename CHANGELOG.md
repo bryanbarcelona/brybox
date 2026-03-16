@@ -1,3 +1,9 @@
+## v0.8.1 (2026-03-16)
+
+### Perf
+
+- **inbox-kraken**: concurrent dropbox downloads + handlers refactor
+
 ## v0.8.0 (2026-03-13)
 
 ### Feat
