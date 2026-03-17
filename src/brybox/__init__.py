@@ -14,6 +14,7 @@ from brybox.core.snap_jedi import SnapJedi
 from brybox.core.videosith import VideoSith
 from brybox.events.verifier import DirectoryVerifier
 from brybox.utils.logging import configure_logging, enable_verbose_logging, log_and_display, log_manager, trackerator
+from brybox.utils.settings import BryboxSettings
 
 # Prevent "No handler found" warnings for the package logger itself
 logging.getLogger(__name__).addHandler(NullHandler())
@@ -23,6 +24,7 @@ logging.getLogger(__name__).addHandler(NullHandler())
 __all__ = [
     'AudioraCore',
     'AudioraNexus',
+    'BryboxSettings',
     'DirectoryVerifier',
     'DoctopusPrime',
     'DoctopusPrimeNexus',

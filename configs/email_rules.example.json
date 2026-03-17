@@ -1,62 +1,74 @@
 [
   {
+    "domain": "example",
     "sender": "billing@example.com",
     "subject": "invoice",
-    "has_pdf_attachment": true,
     "embedded_link": true,
     "action": "DOWNLOAD_PDF"
   },
   {
+    "domain": "example",
     "sender": "service@example.com",
     "subject": "receipt",
     "action": "DELETE"
   },
   {
+    "domain": "socialplatform",
     "sender": "security@socialplatform.com",
     "subject": "account_update",
     "action": "DELETE"
   },
   {
+    "domain": "contentprovider",
     "sender": "audio@contentprovider.com",
     "action": "DOWNLOAD_AUDIO"
   },
   {
+    "domain": "telecom",
     "sender": "support@telecom.com",
     "has_pdf_attachment": true,
     "action": "DOWNLOAD_ATTACH"
   },
   {
+    "domain": "retail",
     "sender": "orders@retail.com",
     "has_pdf_attachment": true,
     "action": "DOWNLOAD_ATTACH"
   },
   {
+    "domain": "store",
     "sender": "delivery@store.com",
     "has_pdf_attachment": true,
     "action": "DOWNLOAD_ATTACH"
   },
   {
+    "domain": "rideshare",
     "sender": "billing@rideshare.com",
     "embedded_link": true,
     "action": "DOWNLOAD_PDF"
   },
   {
+    "domain": "utility",
     "sender": "billing@utility.com",
     "action": "TECHEM"
   },
   {
+    "domain": "bank",
     "sender": "noreply@bank.com",
     "action": "KFW"
   },
   {
+    "domain": "order-confirm",
     "subject": "order_confirmation",
     "action": "MANUAL_CLICK"
   },
   {
+    "domain": "jobsite",
     "sender": "notifications@jobsite.com",
     "action": "DELETE"
   },
   {
+    "domain": "localservice",
     "sender": "noreply@localservice.com",
     "action": "IGNORE"
   }
