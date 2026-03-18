@@ -13,6 +13,7 @@ from brybox.core.inbox_kraken.handlers import (
     download_attachment_handler,
     download_pdf_handler,
     dropbox_audio_handler,
+    gothaer_handler,
     ignore_handler,
     kfw_handler,
     manual_click_handler,
@@ -92,6 +93,7 @@ class InboxKraken:
             Tag.DOWNLOAD_AUDIO: dropbox_audio_handler,
             Tag.TECHEM: techem_handler,
             Tag.KFW: kfw_handler,
+            Tag.GOTHAER: gothaer_handler,
             Tag.MANUAL_CLICK: manual_click_handler,
             Tag.IGNORE: ignore_handler,
             Tag.DELETE: delete_handler,
@@ -128,7 +130,7 @@ class InboxKraken:
 
         # B. PRE-CHECK: Is this sender/subject even in our JSON?
         if not self.classifier.is_candidate(meta):
-            log_and_display(f'[IGNORE] UID: {uid} | {meta.sender[:25]:<25} | Not in rules.')
+            log_and_display(f'[IGNORE] UID: {uid} | {meta.sender} | Not in rules.')
             return
 
         full_meta, msg_obj = self.fetcher.get_full_message(uid)
@@ -140,7 +142,7 @@ class InboxKraken:
         tag = self.classifier.classify(full_meta)
 
         # LOG the found match
-        log_msg = f'[{tag.name}] UID: {uid} | {full_meta.sender[:25]:<25} | {full_meta.subject[:45]:<45}'
+        log_msg = f'[{tag.name}] UID: {uid} | {full_meta.sender} | {full_meta.subject}'
         log_and_display(log_msg)
 
         if tag == Tag.DELETE:

@@ -17,6 +17,7 @@ class Tag(Enum):
     DOWNLOAD_AUDIO = auto()
     TECHEM = auto()
     KFW = auto()
+    GOTHAER = auto()
 
 
 class EmailClassifier:

@@ -31,6 +31,8 @@ class WebCredentials:
     techem_password: str | None = None
     kfw_user: str | None = None
     kfw_password: str | None = None
+    gothaer_user: str | None = None
+    gothaer_password: str | None = None
 
 
 class CredentialsManager:
@@ -61,4 +63,6 @@ class CredentialsManager:
             techem_password=os.getenv('TECHEM_PWD'),
             kfw_user=os.getenv('USER_KFW'),
             kfw_password=os.getenv('KFW_PWD'),
+            gothaer_user=os.getenv('USER_GOTHAER'),
+            gothaer_password=os.getenv('GOTHAER_PWD'),
         )

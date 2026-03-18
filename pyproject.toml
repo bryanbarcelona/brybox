@@ -36,7 +36,7 @@ build-backend = "uv_build"
 
 [tool.ty.src]
 include = ["src/", "tests/"]
-exclude = [".venv"]
+exclude = [".venv/"]
 
 
 [tool.ruff]
