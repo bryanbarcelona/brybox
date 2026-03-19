@@ -37,6 +37,10 @@ class PathBuilder:
         category_config = config.get('categories', {}).get(category, {})
         return category_config.get('filename', category)
 
+    @staticmethod
+    def is_new_file_check(pdf_filepath: Path) -> bool:
+        return not pdf_filepath.is_file()
+
     def build_output_path(self, category: str, filename: str, config: dict[str, Any], pdf_filepath: Path) -> Path:
         """
         Construct the full destination path for a processed PDF.

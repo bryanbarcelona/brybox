@@ -39,14 +39,6 @@ class DoctopusPrime:
         dry_run: bool = False,
         components: DoctopusComponents | None = None,
     ):
-        """
-        Args:
-            pdf_filepath: Path to the PDF file to process.
-            base_dir: Override the target base directory from config.
-            config: Pre-loaded config dict. Loads from BryboxSettings if not provided.
-            dry_run: If True, no files are moved or deleted.
-            components: Injectable collaborator classes. Defaults to standard implementations.
-        """
         self.pdf_filepath = Path(pdf_filepath)
         self.dry_run = dry_run
         self.config = config or BryboxSettings().doctopus
@@ -65,19 +57,17 @@ class DoctopusPrime:
         self.path_builder = c.path_builder(self.base_dir)
         self.file_mover = c.file_mover(dry_run=dry_run)
 
+        self._last_context: ProcessingContext | None = None
+
     def process(self) -> ProcessingContext:
         """
         Run the PDF through the full pipeline.
 
         Returns:
             ProcessingContext populated with all extracted information.
-            If no category is found, context.category will be None and
-            output_filepath will be empty - this is a normal outcome.
-
-        Raises:
-            DoctopusPDFError: If the PDF file is corrupted, missing, or unreadable
-            DoctopusConfigurationError: If configuration is invalid
-            DoctopusFileOperationError: If file system operations fail
+            Note: context.category may be None if no rules matched, but
+            date, invoice_id, and condensed_lines will still be populated
+            if content was readable.
         """
         context = ProcessingContext(pdf_filepath=self.pdf_filepath, base_dir=self.base_dir)
 
@@ -92,11 +82,8 @@ class DoctopusPrime:
 
         context.category = self._classify_document(context.content)
 
-        self._last_context = context
-
         if not context.category:
             log_and_display(f'⏸️ No category match: {self.pdf_filepath.name}', level='info')
-            return context
 
         context.condensed_lines = self.text_processor.reduce_to_relevant_lines(context.content)
         context.condensed_lines = self.special_handler.handle_special_cases(context.category, context.condensed_lines)
@@ -104,14 +91,18 @@ class DoctopusPrime:
         context.document_date = self.metadata_extractor.extract_date(context.condensed_lines)
         context.invoice_id = self.metadata_extractor.extract_invoice_id(context.condensed_lines)
 
-        filename_stem = self.path_builder.get_filename_component(context.category, self.config)
-        context.output_filename = self.path_builder.build_filename(
-            context.document_date, filename_stem, context.invoice_id
-        )
-
-        context.output_filepath = self.path_builder.build_output_path(
-            context.category, context.output_filename, self.config, self.pdf_filepath
-        )
+        if context.category:
+            filename_stem = self.path_builder.get_filename_component(context.category, self.config)
+            context.output_filename = self.path_builder.build_filename(
+                context.document_date, filename_stem, context.invoice_id
+            )
+            context.output_filepath = self.path_builder.build_output_path(
+                context.category, context.output_filename, self.config, self.pdf_filepath
+            )
+            context.is_new_file = self.path_builder.is_new_file_check(context.output_filepath)
+        else:
+            context.output_filename = None
+            context.output_filepath = None
 
         self._last_context = context
         return context
@@ -121,13 +112,8 @@ class DoctopusPrime:
         Move the PDF to its organised destination if categorized.
 
         Returns:
-            True if the file was successfully moved (implies it was categorized).
+            True if the file was successfully moved.
             False if no category matched (file left in place).
-
-        Raises:
-            DoctopusPDFError: If the PDF file is corrupted, missing, or unreadable
-            DoctopusConfigurationError: If configuration is invalid
-            DoctopusFileOperationError: If file system operations fail
         """
         context = self.process()
 
@@ -142,10 +128,10 @@ class DoctopusPrime:
         else:
             context.is_new_file = is_new
             if is_new:
-                log_and_display(f'✅ Moved: {self.pdf_filepath.name} → {context.category}', level='info')
+                log_and_display(f'✅ Moved: {self.pdf_filepath} → {context.category}', level='info')
             else:
                 log_and_display(
-                    f'🔄 Duplicate deleted: {self.pdf_filepath.name} (already exists in {context.category})',
+                    f'🔄 Duplicate deleted: {self.pdf_filepath} (already exists in {context.category})',
                     level='info',
                 )
             self._last_context = context
@@ -157,6 +143,10 @@ class DoctopusPrime:
             if all(trigger in content for trigger in rules.get('triggers', [])):
                 return category
         return None
+
+    @property
+    def preview(self) -> ProcessingContext:
+        return self.process()
 
     @property
     def category(self) -> str | None:

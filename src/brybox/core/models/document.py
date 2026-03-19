@@ -21,9 +21,62 @@ class ProcessingContext:
     condensed_lines: list[str] = field(default_factory=list)
     document_date: str | None = None
     invoice_id: str | None = None
-    output_filename: str = ''
-    output_filepath: Path = Path()
+    output_filename: str | None = None
+    output_filepath: Path | None = None
     is_new_file: bool = True
+
+    def __str__(self):
+        """Custom representation for better readability."""
+        lines = []
+
+        # Header
+        lines.append('\n')
+        lines.append('=' * 50)
+        lines.append('DOCUMENT PROCESSING CONTEXT')
+        lines.append('=' * 50)
+
+        # Status & File Info
+        category_status = f'{self.category}' if self.category else 'None'
+        lines.append(f'Category:        {category_status}')
+        lines.append(f'PDF Name:        {self.pdf_filepath.name}')
+        lines.append(f'PDF Path:        {self.pdf_filepath}')
+        lines.append('')
+
+        # Extracted Metadata
+        lines.append('-' * 20)
+        lines.append('EXTRACTED METADATA')
+        lines.append('-' * 20)
+        lines.append(f'Document Date:   {self.document_date or "None"}')
+        lines.append(f'Invoice ID:      {self.invoice_id or "None"}')
+        lines.append(f'Output Filename: {self.output_filename or "None"}')
+        lines.append(f'Output Path:     {self.output_filepath or "None"}')
+        lines.append(f'Base Directory:  {self.base_dir}')
+        lines.append(f'Is New File:     {self.is_new_file}')
+        lines.append('')
+
+        # Focused Lines
+        lines.append('-' * 20)
+        lines.append('FOCUSED LINES')
+        lines.append('-' * 20)
+        if self.condensed_lines:
+            lines.extend(self.condensed_lines)
+        else:
+            lines.append('(none)')
+        lines.append('')
+
+        # Full Content
+        lines.append('-' * 20)
+        lines.append('FULL CONTENT')
+        lines.append('-' * 20)
+        if self.content:
+            lines.append(self.content)
+        else:
+            lines.append('(empty)')
+
+        lines.append('=' * 50)
+        lines.append('')
+
+        return '\n'.join(lines)
 
 
 @dataclass

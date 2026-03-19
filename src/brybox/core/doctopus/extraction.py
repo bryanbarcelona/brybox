@@ -90,12 +90,21 @@ class TextProcessor:
             'Juni': 'June',
             'Juli': 'July',
             'Oktober': 'October',
-            'Okt': 'Oct',
+            'Okt': 'October',
+            'November': 'November',
             'Dezember': 'December',
-            'Dez': 'Dez',
+            'Dez': 'December',
         }
+
+        # List of English canonical months to check for
+        english_months = list(month_translations.values())
+
         new_lines = []
         for line in lines:
+            if any(month in line for month in english_months):
+                new_lines.append(line)
+                continue
+
             updated_line = line
             for german, english in month_translations.items():
                 updated_line = updated_line.replace(german, english)
@@ -125,14 +134,14 @@ class TextProcessor:
     @staticmethod
     def _apply_trigger_logic(trigger_type: str, trigger: str, line: str, index: int, all_lines: list[str]) -> Any:
         """Handles the specific 'trigger_type' logic for line filtering."""
-        if trigger_type == 'same_line':
+        if trigger_type == '001_same_line':
             segment = f'{trigger}{line.rsplit(trigger, maxsplit=1)[-1]}'
             return [segment.replace(trigger, '').replace(':', '').strip(), segment]
 
-        if trigger_type == 'previous_line' and index > 0:
+        if trigger_type == '002_previous_line' and index > 0:
             return all_lines[index - 1]
 
-        if trigger_type == 'next_line' and index < len(all_lines) - 1:
+        if trigger_type == '003_next_line' and index < len(all_lines) - 1:
             return all_lines[index + 1]
 
         return None
@@ -200,12 +209,25 @@ class SpecialCaseHandler:
     # TODO: move to a dedicated special_cases.py once a second special case is added.
     """
 
-    def handle_special_cases(self, category: str, lines: list[str]) -> list[str]:
+    def handle_special_cases(self, category: str | None, lines: list[str]) -> list[str]:
         """Dispatch to category-specific handler, returning lines unchanged if none applies."""
+        if category == 'Bolt Invoice':
+            return self._handle_bolt(lines)
         if category == 'McDonalds Rechnung':
             return self._handle_mcdonalds(lines)
 
         return lines
+
+    @staticmethod
+    def _handle_bolt(lines: list[str]) -> list[str]:
+        """
+        Normalise Bolt invoice labels.
+
+        Bolt receipts often use 'Rechnung ' without a colon, which can interfere
+        with key-value extraction. This ensures the line uses 'Rechnung: '
+        to maintain consistency for the standard parser.
+        """
+        return [line.replace('Rechnung ', 'Rechnung: ') for line in lines]
 
     @staticmethod
     def _handle_mcdonalds(lines: list[str]) -> list[str]:

@@ -1,5 +1,5 @@
 {
-  "same_line": [
+  "001_same_line": [
     "Invoice Date",
     "Invoice Number",
     "Bill No.",
@@ -13,13 +13,13 @@
     "Statement",
     "Delivery Date"
   ],
-  "previous_line": [
+  "002_previous_line": [
     "Parking Permit",
     "Utility Provider",
     "Bank Statement",
     "Service Provider"
   ],
-  "next_line": [
+  "003_next_line": [
     "Document Date",
     "Order ID",
     "Booking Number",
