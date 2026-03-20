@@ -213,6 +213,8 @@ class SpecialCaseHandler:
         """Dispatch to category-specific handler, returning lines unchanged if none applies."""
         if category == 'Bolt Invoice':
             return self._handle_bolt(lines)
+        if category == 'Gothaer Beitragsrechnung':
+            return self._handle_gothaer(lines)
         if category == 'McDonalds Rechnung':
             return self._handle_mcdonalds(lines)
 
@@ -221,7 +223,7 @@ class SpecialCaseHandler:
     @staticmethod
     def _handle_bolt(lines: list[str]) -> list[str]:
         """
-        Normalise Bolt invoice labels.
+        Normalize Bolt invoice labels.
 
         Bolt receipts often use 'Rechnung ' without a colon, which can interfere
         with key-value extraction. This ensures the line uses 'Rechnung: '
@@ -230,9 +232,44 @@ class SpecialCaseHandler:
         return [line.replace('Rechnung ', 'Rechnung: ') for line in lines]
 
     @staticmethod
+    def _handle_gothaer(lines: list[str]) -> list[str]:
+        """
+        Normalize Gothaer document formatting by adding sensible spaces.
+
+        Gothaer documents often have text without proper spacing, which can
+        interfere with entity extraction. This handler adds spaces in three cases:
+        1. After delimiters (:,;.!?) followed directly by text
+        2. Between digits and letters (e.g., "20May2025" -> "20 May 2025")
+        3. Between lowercase followed by uppercase (e.g., "Köln," -> "Köln, ")
+        """
+        processed_lines = []
+
+        for line in lines:
+            original_line = line
+            modified_line = line
+
+            modified_line = re.sub(r'([:;,.!?])([^\s])', r'\1 \2', modified_line)
+
+            modified_line = re.sub(r'(\d)([A-Za-z])', r'\1 \2', modified_line)  # digit then letter
+            modified_line = re.sub(r'([A-Za-z])(\d)', r'\1 \2', modified_line)  # letter then digit
+
+            modified_line = re.sub(r'([a-zöäüß])([A-ZÖÄÜ])', r'\1 \2', modified_line)
+
+            modified_line = re.sub(r'([a-zöäüß]+,)([A-ZÖÄÜ0-9])', r'\1 \2', modified_line)
+
+            modified_line = re.sub(r'\s+', ' ', modified_line).strip()
+
+            if modified_line != original_line:
+                processed_lines.append(modified_line)
+            else:
+                processed_lines.append(original_line)
+
+        return processed_lines
+
+    @staticmethod
     def _handle_mcdonalds(lines: list[str]) -> list[str]:
         """
-        Normalise McDonald's date format.
+        Normalize McDonald's date format.
 
         McDonald's receipts use DD/MM/YYYY with American-style '/' delimiters,
         which dateutil misreads as MM/DD/YYYY. This rewrites matches to DD.MM.YYYY

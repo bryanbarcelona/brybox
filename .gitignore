@@ -23,6 +23,7 @@ wheels/
 # Log folders and files
 logs/
 *.log
+*.csv
 
 # Legacy backup files
 legacy/
