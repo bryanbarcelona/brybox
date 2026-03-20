@@ -1,5 +1,6 @@
 import email
 import imaplib
+import re
 from email.message import Message
 
 from brybox.core.inbox_kraken.helpers import decode_mime_words, extract_invoice_link
@@ -63,6 +64,68 @@ class EmailFetcher:
             attachments=[],
             invoice_link=None,
         )
+
+    def get_light_meta_batch(
+        self,
+        uids: list[int],
+        limit: int | None = None,
+        only_uids: list[int] | None = None,
+    ) -> list[EmailMeta]:
+        """
+        FAST: Fetches headers for multiple UIDs in a single IMAP round trip.
+        Intended for preview — never triggers a full message fetch.
+
+        Args:
+            uids:      Full list of UIDs to fetch (already resolved by fetch_uids).
+            limit:     Optional cap — takes the last N UIDs (consistent with fetch_uids).
+            only_uids: Optional explicit UID subset to restrict to.
+
+        Returns:
+            List of EmailMeta objects with uid, sender, subject populated.
+            attachments=[], invoice_link=None, body_html='' — same as get_light_meta.
+        """
+        if only_uids:
+            uids = [u for u in uids if u in only_uids]
+        if limit:
+            uids = uids[-limit:]
+        if not uids:
+            return []
+
+        uid_str = ','.join(str(u) for u in uids)
+
+        try:
+            typ, data = self.mail.uid('FETCH', uid_str, '(BODY.PEEK[HEADER])')
+        except TimeoutError as e:
+            raise InboxKrakenTimeoutError('Timeout during batch header fetch', error_detail=str(e)) from e
+        except (imaplib.IMAP4.error, OSError) as e:
+            raise InboxKrakenNetworkError('Network failure during batch header fetch', error_detail=str(e)) from e
+
+        if typ != 'OK' or not data:
+            raise InboxKrakenOperationFailedError(f'Batch IMAP fetch failed. Status: {typ}')
+
+        results: list[EmailMeta] = []
+        for i, item in enumerate(data):
+            # imaplib interleaves response tuples with b')' separator bytes — skip those
+            if not isinstance(item, tuple):
+                continue
+            raw_uid_header, raw_headers = item
+            # UID is embedded in the response header e.g. b'123 (UID 456 BODY...)'
+            uid_match = re.search(rb'UID (\d+)', raw_uid_header)
+            uid = int(uid_match.group(1)) if uid_match else uids[i // 2]
+
+            msg = email.message_from_bytes(raw_headers)
+            results.append(
+                EmailMeta(
+                    uid=uid,
+                    subject=decode_mime_words(msg.get('Subject', '')),
+                    sender=decode_mime_words(msg.get('From', '')),
+                    body_html='',
+                    attachments=[],
+                    invoice_link=None,
+                )
+            )
+
+        return results
 
     def get_full_message(self, uid: int) -> tuple[EmailMeta | None, Message | None]:
         """SLOW: Fetches full content for PDF/Attachment extraction."""

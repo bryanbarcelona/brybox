@@ -19,6 +19,7 @@ from brybox.core.inbox_kraken.handlers import (
     manual_click_handler,
     techem_handler,
 )
+from brybox.core.inbox_kraken.preview import run_preview
 from brybox.core.models.email import ProcessingContext
 from brybox.exceptions.emails import (
     InboxKrakenConfigurationError,
@@ -121,6 +122,26 @@ class InboxKraken:
                 log_and_display(f'⚠️ UID {uid} processing skipped: {e}', level='WARNING')
             except Exception as e:  # noqa: BLE001
                 log_and_display(f'❌ Unexpected error on UID {uid}: {e}', level='ERROR')
+
+    def preview(
+        self,
+        mailbox: str = 'INBOX',
+        limit: int | None = None,
+        only_uids: list[int] | None = None,
+        *,
+        output_csv: Path | str | None = None,
+        print_console: bool = False,
+    ) -> list[dict[str, str]]:
+        """Preview the inbox without performing any actions. See preview.run_preview for full docs."""
+        return run_preview(
+            fetcher=self.fetcher,
+            rules=self.rules,
+            mailbox=mailbox,
+            limit=limit,
+            only_uids=only_uids,
+            output_csv=output_csv,
+            print_console=print_console,
+        )
 
     def _process_single_email(self, uid: int) -> None:
         # A. LIGHT FETCH
