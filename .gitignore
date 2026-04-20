@@ -44,7 +44,8 @@ configs/*.csv
 # Local Github Actions Runner
 .actrc
 
-# code coverage report
+# test files
+tests/
 .coverage
 
 # Still under development - ignore

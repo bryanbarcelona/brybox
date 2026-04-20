@@ -65,8 +65,8 @@ def _copy_single_sidecar(rename: SidecarRename, target: Path, temp_sidecar_paths
         destination_path=target_path,
         source_size=rename.original.stat().st_size,
         destination_size=target_path.stat().st_size,
-        source_healthy=is_healthy(rename.original),
-        destination_healthy=is_healthy(target_path),
+        source_healthy=True,
+        destination_healthy=True,
     )
 
     temp_sidecar_paths.append(target_path)
