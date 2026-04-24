@@ -155,6 +155,17 @@ class MetadataExtractor:
 
     def extract_date(self, lines: list[str]) -> str | None:
         """Extract and return the first valid date found in lines as YYYYMMDD."""
+
+        iso_pattern = r'(?<!\d)\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)'
+        for line in lines:
+            match = re.search(iso_pattern, line)
+            if match:
+                try:
+                    parsed = parser.parse(match.group(0))
+                    return parsed.strftime('%Y%m%d')
+                except (ValueError, TypeError, parser.ParserError):
+                    continue
+
         date_patterns = self.config.get('metadata_triggers', {}).get('date_patterns', [])
         if not date_patterns:
             date_patterns = [r'\b(?:\d{1,2}(?:st|nd|rd|th)?[ ./-](?:\d{1,2}|[a-zA-Z]+)[ ./-]\d{2,4})\b']
