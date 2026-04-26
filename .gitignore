@@ -51,7 +51,7 @@ tests/
 # Still under development - ignore
 
 tester.py
-test_env_resetter.py
+tetst_env_resetter.py
 test_env_resetter2.py
 src/brybox/core/doismith.py
 src/brybox/core/dropboss.py

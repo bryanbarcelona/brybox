@@ -43,7 +43,7 @@ exclude = [".venv/"]
 preview = true
 line-length = 120
 target-version = "py312"
-extend-exclude = ["tests", "legacy", "main.py", "test_env_resetter.py", "CHANGELOG.md"]
+extend-exclude = ["legacy", "main.py", "tetst_env_resetter.py", "CHANGELOG.md"]
 fix = true
 
 lint.select = [

@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from brybox.core.doctopus.extraction import MetadataExtractor, SpecialCaseHandler, TextProcessor
-from brybox.core.doctopus.file_ops import FileMover
 from brybox.core.doctopus.path_builder import PathBuilder
+from brybox.utils.file_ops import FileMover
 
 
 @dataclass
