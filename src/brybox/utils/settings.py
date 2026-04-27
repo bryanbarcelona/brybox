@@ -16,6 +16,7 @@ CF_PATHS = 'paths'
 CF_EMAIL_RULES = 'email_rules'
 CF_EMAIL_DELETE_LIST = 'email_delete_list'
 CF_PIXELPORTER_PATHS = 'pixelporter_paths'
+CF_DOISMITH_PATHS = 'doismith_paths'
 
 
 class BryboxSettings:
@@ -82,6 +83,11 @@ class BryboxSettings:
             model=FlatDict(),
             sources=[CF_PIXELPORTER_PATHS],
         )
+        self._loader.register_pipe(
+            name='literature.paths',
+            model=FlatDict(),
+            sources=[CF_PATHS],
+        )
 
     # ── Public API (unchanged) ────────────────────────────────────────────────
 
@@ -113,3 +119,7 @@ class BryboxSettings:
     @property
     def pixelporter(self) -> dict[str, Any]:
         return {'paths': self._loader.get('pixelporter.paths')}
+
+    @property
+    def doismith(self) -> dict[str, Any]:
+        return {'target_dir': self._loader.get('literature.paths').get('literature_dir')}

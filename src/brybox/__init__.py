@@ -8,6 +8,7 @@ from logging import NullHandler
 # Public API re-exports
 from brybox.core.audiora import AudioraCore, AudioraNexus
 from brybox.core.doctopus.doctopus import DoctopusPrime, DoctopusPrimeNexus
+from brybox.core.doismith import DoiSmithNexus, DoiSmithPrime
 from brybox.core.inbox_kraken.engine import InboxKraken
 from brybox.core.porter import push_photos, push_videos
 from brybox.core.snap_jedi import SnapJedi
@@ -28,6 +29,8 @@ __all__ = [
     'DirectoryVerifier',
     'DoctopusPrime',
     'DoctopusPrimeNexus',
+    'DoiSmithNexus',
+    'DoiSmithPrime',
     'InboxKraken',
     'SnapJedi',
     'VideoSith',
