@@ -3,7 +3,7 @@ import imaplib
 import re
 from email.message import Message
 
-from brybox.core.inbox_kraken.helpers import decode_mime_words, extract_invoice_link
+from brybox.core.inbox_kraken.helpers import decode_mime_words, extract_invoice_link, extract_invoice_link_from_text
 from brybox.core.models.email import EmailMeta
 from brybox.exceptions.emails import (
     InboxKrakenNetworkError,
@@ -127,6 +127,35 @@ class EmailFetcher:
 
         return results
 
+    @staticmethod
+    def _extract_body_and_link(msg: Message) -> tuple[str, str | None]:
+        """Extract HTML body (if any) and invoice link from email message."""
+        body_html = ''
+        link = None
+
+        # First pass: HTML part
+        for part in msg.walk():
+            if part.get_content_type() == 'text/html' and not part.get_filename():
+                payload = part.get_payload(decode=True)
+                if isinstance(payload, bytes):
+                    body_html = payload.decode(errors='ignore')
+                link = extract_invoice_link(body_html)
+                if link:
+                    return body_html, link
+                break  # Stop searching HTML after first HTML part
+
+        # Second pass: plain text part if link not found
+        if not link:
+            for part in msg.walk():
+                if part.get_content_type() == 'text/plain' and not part.get_filename():
+                    payload = part.get_payload(decode=True)
+                    if isinstance(payload, bytes):
+                        text = payload.decode(errors='ignore')
+                        link = extract_invoice_link_from_text(text)
+                    break
+
+        return body_html, link
+
     def get_full_message(self, uid: int) -> tuple[EmailMeta | None, Message | None]:
         """SLOW: Fetches full content for PDF/Attachment extraction."""
         try:
@@ -142,17 +171,10 @@ class EmailFetcher:
         raw_message = data[0][1]
         msg = email.message_from_bytes(raw_message)
 
-        body_html = ''
-        for part in msg.walk():
-            if part.get_content_type() == 'text/html' and not part.get_filename():
-                payload = part.get_payload(decode=True)
-                if isinstance(payload, bytes):
-                    body_html = payload.decode(errors='ignore')
-                break
+        body_html, link = self._extract_body_and_link(msg)
 
-        attachments: list[str | None] = [p.get_filename() for p in msg.walk() if p.get_filename()]
-        attachments: list[str] = [f for f in attachments if f is not None]  # Remove None values
-        link: str | None = extract_invoice_link(body_html)
+        attachments = [p.get_filename() for p in msg.walk() if p.get_filename()]
+        attachments = [f for f in attachments if f is not None]
 
         meta = EmailMeta(
             uid=uid,

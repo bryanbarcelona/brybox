@@ -60,10 +60,18 @@ class EmailClassifier:
             return False
 
         # 4. Embedded Link Strictness
-        if rule.get('embedded_link'):
-            return bool(meta.invoice_link and classify_link(meta.invoice_link) == 'PDF')
+        if not rule.get('embedded_link'):
+            return True
 
-        return True
+        # No link? Can't proceed.
+        if not meta.invoice_link:
+            return False
+
+        # Check if link points to PDF (classification or pattern fallback)
+        is_pdf = classify_link(meta.invoice_link) == 'PDF' or any(
+            pat in meta.invoice_link.lower() for pat in ('/receipt/download', '/invoice/pdf', '.pdf')
+        )
+        return is_pdf
 
     @staticmethod
     def _smart_match(pattern: str, text: str) -> bool:

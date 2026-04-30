@@ -1,6 +1,7 @@
 import re
 from email.header import decode_header
 from pathlib import Path
+from urllib.parse import unquote
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -128,6 +129,16 @@ def extract_invoice_link(html: str) -> str | None:
         if any(k in text or k in href_lower for k in ('invoice', 'receipt', 'rechnung', 'beleg')):
             return href_value
 
+    return None
+
+
+def extract_invoice_link_from_text(text: str) -> str | None:
+
+    urls = re.findall(r'https?://[^\s<>"\'()]+', text)
+    for url in urls:
+        decoded = unquote(url.lower())
+        if any(k in decoded for k in ('invoice', 'receipt', 'rechnung', 'beleg', 'download')):
+            return unquote(url)  # Return decoded URL
     return None
 
 
