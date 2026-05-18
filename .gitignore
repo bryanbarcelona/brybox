@@ -8,6 +8,8 @@ __pycache__/
 build/
 dist/
 wheels/
+.ruff_cache/
+.pytest_cache/
 *.egg-info
 
 # IDE/editor config files
@@ -32,12 +34,10 @@ legacy/
 assets/
 
 # Config files (sensitive)
-
 configs/*.json
 configs/*.csv
 
 # Allow config example files
-
 !configs/*.example.json
 !configs/*.example.csv
 
@@ -50,6 +50,7 @@ tests/
 
 # Still under development - ignore
 
+chrome_profile/
 tester.py
 tetst_env_resetter.py
 test_env_resetter2.py
@@ -58,3 +59,4 @@ src/brybox/core/dropboss.py
 src/brybox/core/snap_jedi.py
 src/brybox/core/video_sith.py
 main.py
+first_run.py

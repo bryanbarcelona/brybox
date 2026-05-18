@@ -81,6 +81,9 @@ class AudioraCore:
         self.path_builder = PathBuilder(self.base_dir)
         self.file_mover = FileMover(self.base_dir, dry_run=dry_run)
 
+        self._cached_category: str | None = None
+        self._cached_validated_date: str | None = None
+
     def process(self) -> _ProcessingContext:
         """
         Process the audio file through the complete pipeline.
@@ -134,6 +137,10 @@ class AudioraCore:
             context.category, context.output_filename, self.config, self.audio_filepath
         )
         context.output_filepath = built_path or ''
+
+        # Cache for property access after file is moved
+        self._cached_category = context.category
+        self._cached_validated_date = context.validated_date
 
         return context
 
@@ -191,15 +198,17 @@ class AudioraCore:
 
     @property
     def category(self) -> str | None:
-        """Get audio file category."""
-        context = self.process()
-        return context.category
+        """Get audio file category (cached)."""
+        if self._cached_category is None:
+            self.process()
+        return self._cached_category
 
     @property
     def validated_date(self) -> str | None:
-        """Get validated date."""
-        context = self.process()
-        return context.validated_date
+        """Get validated date (cached)."""
+        if self._cached_validated_date is None:
+            self.process()
+        return self._cached_validated_date
 
 
 class AudioraNexus:
