@@ -201,7 +201,3 @@ def trackerator(items: list, description: str = 'Working...', final_message: str
 
     # bar may already be stopped; if not, swap text and stop
     log_manager.finalize_progress(final_message)
-
-
-if __name__ == '__main__':
-    pass

@@ -7,4 +7,4 @@ and renames files to '{title} - {author} ({year}).pdf'.
 
 from brybox.core.doismith.doismith import DoiSmithNexus, DoiSmithPrime
 
-__all__ = ['DoiSmithPrime', 'DoiSmithNexus']
+__all__ = ['DoiSmithNexus', 'DoiSmithPrime']

@@ -26,6 +26,7 @@ class LiteratureError(BryboxError):
 
 # ── PDF I/O ───────────────────────────────────────────────────────────────────
 
+
 class LiteraturePDFError(LiteratureError):
     """PDF file is unreadable — corrupted, password-protected, or malformed."""
 
@@ -35,6 +36,7 @@ class LiteraturePDFNotFoundError(LiteraturePDFError):
 
 
 # ── DOI / CrossRef ────────────────────────────────────────────────────────────
+
 
 class LiteratureDOIError(LiteratureError):
     """Base for DOI resolution failures."""
@@ -58,6 +60,7 @@ class LiteratureMetadataError(LiteratureDOIError):
 
 # ── File system ───────────────────────────────────────────────────────────────
 
+
 class LiteratureFileOperationError(LiteratureError):
     """A filesystem move, delete, or directory creation failed."""
 
@@ -73,6 +76,7 @@ class LiteratureFileOperationError(LiteratureError):
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
+
 
 class LiteratureConfigurationError(LiteratureError):
     """Settings are missing or invalid — target_dir not configured, etc."""

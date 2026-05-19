@@ -258,7 +258,3 @@ class KfwScraper(BaseScraper):
 
         context.remove_listener('request', capture_request)
         return captured_request[0]
-
-
-if __name__ == '__main__':
-    pass
