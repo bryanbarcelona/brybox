@@ -20,6 +20,8 @@ from brybox.utils.logging import log_and_display
 class AudioMetadataExtractor:
     """Extracts metadata from audio files using exiftool."""
 
+    HASH_PREFIX = 'AUDIOHASH:'
+
     def __init__(self):
         pass
 
@@ -165,3 +167,40 @@ class AudioMetadataExtractor:
 
         # Prefer metadata date over filename date
         return metadata_date or filename_date
+
+    @staticmethod
+    def read_content_hash(filepath: Path) -> str | None:
+        """
+        Read content hash from Comment tag (prefixed with AUDIOHASH:).
+
+        Returns:
+            Hash string or None if not present.
+
+        Raises:
+            AudioraMetadataError: If exiftool fails to read the file.
+        """
+        try:
+            with exiftool.ExifToolHelper() as et:
+                meta = et.get_metadata(str(filepath))[0]
+                comment = meta.get('Comment')
+                if comment and comment.startswith(AudioMetadataExtractor.HASH_PREFIX):
+                    return comment[len(AudioMetadataExtractor.HASH_PREFIX) :]
+                return None
+        except (ExifToolExecuteError, OSError, KeyError, IndexError) as e:
+            raise AudioraMetadataError(
+                f'Failed to read content hash from {filepath}: {e}', audio_path=str(filepath)
+            ) from e
+
+    @staticmethod
+    def write_content_hash(filepath: Path, content_hash: str) -> None:
+        try:
+            with exiftool.ExifToolHelper() as et:
+                et.set_tags(
+                    str(filepath),
+                    {'Comment': f'{AudioMetadataExtractor.HASH_PREFIX}{content_hash}'},
+                    params=['-overwrite_original'],
+                )
+        except (ExifToolExecuteError, OSError) as e:
+            raise AudioraMetadataError(
+                f'Failed to write content hash to {filepath}: {e}', audio_path=str(filepath)
+            ) from e

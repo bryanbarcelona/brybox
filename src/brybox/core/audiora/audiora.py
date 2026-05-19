@@ -6,6 +6,7 @@ A sleek, futuristic audio processing system for organizing audio files.
 from dataclasses import dataclass
 from pathlib import Path
 
+from brybox.core.audiora.deduplicator import ContentHashDeduplicator, DeduplicatorProtocol
 from brybox.core.audiora.file_ops import FileMover
 from brybox.core.audiora.filename import FilenameProcessor
 from brybox.core.audiora.metadata import AudioMetadataExtractor
@@ -18,6 +19,7 @@ from brybox.exceptions.audio import (
     AudioraFileOperationError,
     AudioraMetadataError,
 )
+from brybox.utils.deduplicator import HashDeduplicator
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
 from brybox.utils.settings import BryboxSettings
 
@@ -45,11 +47,12 @@ class AudioraCore:
 
     def __init__(
         self,
-        audio_filepath: str,
+        audio_filepath: str | Path,
         base_dir: str | None = None,
         config: dict | None = None,
         *,
         dry_run: bool = False,
+        deduplicator: DeduplicatorProtocol | None = None,
     ) -> None:
         """
         Initialize audio file processor.
@@ -61,7 +64,7 @@ class AudioraCore:
             config: Pre-loaded config dict
             dry_run: If True, no files are moved or deleted
         """
-        self.audio_filepath = audio_filepath
+        self.audio_filepath = str(audio_filepath)
         self.dry_run = dry_run
 
         # Load configuration
@@ -69,20 +72,53 @@ class AudioraCore:
 
         # Determine base directory
         if base_dir:
-            self.base_dir = base_dir
+            self.base_dir = str(base_dir)
         elif 'audio_target_dir' in self.config:
             self.base_dir = self.config['audio_target_dir']
         else:
             self.base_dir = str(Path.home() / 'AudioFiles')
 
         # Initialize processors
+        self.deduplicator = deduplicator
         self.metadata_extractor = AudioMetadataExtractor()
         self.filename_processor = FilenameProcessor(self.config)
-        self.path_builder = PathBuilder(self.base_dir)
+        self.path_builder = PathBuilder(
+            self.base_dir,
+            file_checker=self.deduplicator.files_have_same_content if self.deduplicator else None,
+        )
         self.file_mover = FileMover(self.base_dir, dry_run=dry_run)
 
         self._cached_category: str | None = None
         self._cached_validated_date: str | None = None
+
+    def _check_duplicate_and_delete(self) -> bool:
+        """Check if source file content already exists in destination.
+        If yes, delete source and return True.
+        """
+        if self.deduplicator is None:
+            return False
+        src = Path(self.audio_filepath)
+        if self.deduplicator.is_duplicate(src):
+            src.unlink()
+            log_and_display(f'🔄 Duplicate deleted (content match): {src.name}')
+            return True
+        return False
+
+    def _log_audio_error(self, e: AudioraError) -> None:
+        """Log appropriate message for the exception type, then re-raise."""
+        name = Path(self.audio_filepath).name if self.audio_filepath else 'unknown'
+        if isinstance(e, AudioraAudioNotFoundError):
+            log_and_display(f'📄 File not found: {name}', level='error')
+        elif isinstance(e, AudioraMetadataError):
+            log_and_display(f'📊 Metadata error for {name}: {e}', level='error')
+        elif isinstance(e, AudioraConfigurationError):
+            log_and_display(f'⚙️ Configuration error: {e}', level='error')
+        elif isinstance(e, AudioraFileOperationError):
+            log_and_display(f'📁 File operation error: {e}', level='error')
+        elif isinstance(e, AudioraCorruptedFileError):
+            log_and_display(f'💥 Corrupted file: {e}', level='error')
+        else:
+            log_and_display(f'⚠️ Audio error: {e}', level='error')
 
     def process(self) -> _ProcessingContext:
         """
@@ -145,40 +181,19 @@ class AudioraCore:
         return context
 
     def shuttle_service(self) -> bool:
-        """
-        Move file to organized location.
+        if self._check_duplicate_and_delete():
+            return False
 
-        Returns:
-            True if file was successfully processed (moved or identified as duplicate)
-            False if file had no category match (left in place)
-
-        Raises:
-            AudioraAudioNotFoundError: If source file doesn't exist
-            AudioraMetadataError: If metadata extraction fails
-            AudioraConfigurationError: If configuration is invalid (fatal)
-            AudioraFileOperationError: If file operations fail
-            AudioraCorruptedFileError: If moved file is corrupted
-        """
         try:
             context = self.process()
-        except AudioraAudioNotFoundError:
-            log_and_display(f'📄 File not found: {Path(self.audio_filepath).name}', level='error')
-            raise
-        except AudioraMetadataError as e:
-            log_and_display(f'📊 Metadata error for {Path(self.audio_filepath).name}: {e}', level='error')
-            raise
-        except AudioraConfigurationError as e:
-            log_and_display(f'⚙️ Configuration error: {e}', level='error')
-            raise
-        except AudioraFileOperationError as e:
-            log_and_display(f'📁 File operation error: {e}', level='error')
-            raise
-        except AudioraCorruptedFileError as e:
-            log_and_display(f'💥 Corrupted file: {e}', level='error')
+        except AudioraError as e:
+            self._log_audio_error(e)
             raise
 
         if not context.category or not context.output_filepath:
             return False
+
+        src_hash = HashDeduplicator._hash_file(Path(context.audio_filepath)) if self.deduplicator is not None else None
 
         try:
             success, is_new = self.file_mover.move_file(context.audio_filepath, context.output_filepath)
@@ -189,6 +204,9 @@ class AudioraCore:
             context.is_new_file = is_new
             if is_new:
                 log_and_display(f'✅ Moved: {Path(self.audio_filepath).name} → {context.output_filepath}')
+                # Add hash to deduplicator for in‑batch duplicate detection
+                if self.deduplicator is not None and src_hash is not None:
+                    self.deduplicator.add_hash(src_hash)
             else:
                 log_and_display(
                     f'🔄 Duplicate deleted: {Path(self.audio_filepath).name} (already exists in {context.category})',
@@ -237,11 +255,16 @@ class AudioraNexus:
             AudioraConfigurationError: If directory doesn't exist
         """
         self.dir_path = Path(dir_path)
-        self.base_dir = base_dir
         self.dry_run = dry_run
         self.processor_class = processor_class
-
         self.config = config or BryboxSettings().audiora
+
+        if base_dir:
+            self.base_dir = Path(base_dir)
+        elif 'audio_target_dir' in self.config:
+            self.base_dir = Path(self.config['audio_target_dir'])
+        else:
+            self.base_dir = Path.home() / 'AudioFiles'
 
         if not self.dir_path.exists():
             raise AudioraConfigurationError(f'Directory does not exist: {dir_path}', audio_path=dir_path)
@@ -280,6 +303,8 @@ class AudioraNexus:
             else audio_files
         )
 
+        deduplicator = ContentHashDeduplicator(Path(self.base_dir))
+
         for audio_file in audio_files:
             # Initialize with proper types
             result: dict[str, bool | str | None] = {
@@ -292,9 +317,10 @@ class AudioraNexus:
             try:
                 processor = self.processor_class(
                     audio_filepath=audio_file,  # Pass Path directly
-                    base_dir=self.base_dir,
+                    base_dir=str(self.base_dir),
                     config=self.config,
                     dry_run=self.dry_run,
+                    deduplicator=deduplicator,
                 )
 
                 processed = processor.shuttle_service()

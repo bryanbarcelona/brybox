@@ -8,12 +8,14 @@ from pathlib import Path
 import exiftool
 from exiftool.exceptions import ExifToolExecuteError
 
+from brybox.core.audiora.metadata import AudioMetadataExtractor
 from brybox.events.bus import publish_file_deleted, publish_file_moved
 from brybox.exceptions.audio import (
     AudioraAudioNotFoundError,
     AudioraCorruptedFileError,
     AudioraFileOperationError,
 )
+from brybox.utils.deduplicator import HashDeduplicator
 
 
 class FileMover:
@@ -113,8 +115,12 @@ class FileMover:
 
     def _perform_move(self, source_path: Path, dest_path: Path, file_size: int) -> tuple[bool, bool]:
         """Move file and verify health."""
+        source_hash = HashDeduplicator._hash_file(source_path)
+
         self._execute_move(source_path, dest_path)
         self._verify_health(dest_path)
+
+        AudioMetadataExtractor.write_content_hash(dest_path, source_hash)
         publish_file_moved(source_path, dest_path, file_size, is_healthy=True)
         return True, True
 
