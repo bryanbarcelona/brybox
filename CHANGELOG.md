@@ -1,3 +1,26 @@
+## v0.9.0 (2026-05-19)
+
+### Feat
+
+- **audiora**: add content-hash deduplication with metadata storage
+- **doismith**: add academic PDF renaming pipeline
+- **doctopus**: add ISO date pattern support to metadata extraction
+- **inbox-kraken**: add preview mode for non-destructive inbox classification
+- **web-marionette**: add Gothaer document scraper and inbox_kraken handler
+
+### Fix
+
+- **audiora**: cache category and validated date after processing
+- **inbox_kraken**: improve embedded link extraction and PDF download reliability
+- **porter**: bypass health check for sidecar staging copies
+- **doctopus**: add spacing normalization for Gothaer
+
+### Refactor
+
+- **file-ops**: move FileMover to brybox/utils/file_ops.py
+- **doctopus**: ensure trigger ordering and improve debugging context
+- **config**: replace config_loader with pipe-based config submodule
+
 ## v0.8.1 (2026-03-16)
 
 ### Perf
