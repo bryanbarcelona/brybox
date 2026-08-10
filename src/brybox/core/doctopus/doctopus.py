@@ -84,6 +84,10 @@ class DoctopusPrime:
 
         if not context.category:
             log_and_display(f'⏸️ No category match: {self.pdf_filepath.name}', level='info')
+        else:
+            extra_pages = self.config.get('categories', {}).get(context.category, {}).get('extra_pages', 0)
+            if extra_pages:
+                context.content = self.text_processor.extract_content(self.pdf_filepath, max_pages=1 + extra_pages)
 
         context.condensed_lines = self.text_processor.reduce_to_relevant_lines(context.content)
         context.condensed_lines = self.special_handler.handle_special_cases(context.category, context.condensed_lines)
@@ -249,7 +253,7 @@ class DoctopusPrimeNexus:
                 result['error'] = str(e)
                 # No logging here - Prime already logged it
 
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # ruff: ignore[blind-except]
                 result['error'] = f'Unexpected error: {e}'
                 log_and_display(f'💥 Unexpected error for {pdf_file.name}: {e}', level='error')
 

@@ -24,8 +24,8 @@ class TextProcessor:
         self.config = config
 
     @staticmethod
-    def extract_content(pdf_path: Path) -> str:
-        """Extract text content from the first page of a PDF."""
+    def extract_content(pdf_path: Path, max_pages: int = 1) -> str:
+        """Extract text content from the first `max_pages` page(s) of a PDF."""
         if not pdf_path.exists():
             raise DoctopusPDFNotFoundError(f'PDF file not found: {pdf_path}', pdf_path=pdf_path)
 
@@ -34,8 +34,8 @@ class TextProcessor:
                 if not pdf.pages:
                     return ''  # Empty PDF, not an error
 
-                text = pdf.pages[0].extract_text()
-                return text or ''  # None becomes empty string, not an error
+                pages = pdf.pages[:max_pages]
+                return '\n'.join(page.extract_text() or '' for page in pages)
 
         except (MalformedPDFException, PdfminerException) as e:
             raise DoctopusPDFError(f'PDF is corrupted or invalid: {pdf_path}', pdf_path=pdf_path) from e
@@ -208,7 +208,8 @@ class MetadataExtractor:
                     invoice_number = (
                         line.replace(trigger, '').replace(':', '').replace('. ', '').replace(')', '').strip()
                     )
-                    return invoice_number.split(' ')[0]
+                    candidate = invoice_number.split(' ')[0]
+                    return candidate.replace('\x00', '') if candidate else None
 
         return None
 
@@ -220,6 +221,11 @@ class SpecialCaseHandler:
     # TODO: move to a dedicated special_cases.py once a second special case is added.
     """
 
+    _UNI_HAMBURG_CATEGORIES = frozenset({
+        'UHH Beitragsbescheid',
+        'Musterzahlträger',
+    })
+
     def handle_special_cases(self, category: str | None, lines: list[str]) -> list[str]:
         """Dispatch to category-specific handler, returning lines unchanged if none applies."""
         if category == 'Bolt Invoice':
@@ -228,6 +234,10 @@ class SpecialCaseHandler:
             return self._handle_gothaer(lines)
         if category == 'McDonalds Rechnung':
             return self._handle_mcdonalds(lines)
+        if category == 'Haspa Kontoauszug':
+            return self._handle_haspa(lines)
+        if category in self._UNI_HAMBURG_CATEGORIES:
+            return self._handle_university(lines)
 
         return lines
 
@@ -294,3 +304,53 @@ class SpecialCaseHandler:
                 lines[i] = match.group(0).replace('/', '.')
 
         return lines
+
+    @staticmethod
+    def _handle_haspa(lines: list[str]) -> list[str]:
+        """Truncates the account statement lines before the table header.
+
+        This removes the header and any trailing text to prevent confounding dates
+        at the bottom of the statement from interfering with the parser.
+
+        Args:
+            lines: A list of raw text lines from the account statement.
+
+        Returns:
+            A list of lines leading up to, but excluding, the trigger header line.
+        """
+        reduced_lines = []
+
+        for line in lines:
+            if 'Datum Erläuterung Betrag' in line:
+                break
+            reduced_lines.append(line)
+
+        return reduced_lines
+
+    @staticmethod
+    def _handle_university(lines: list[str]) -> list[str]:
+        """
+        Normalizes Universität Hamburg layout quirks shared by Beitragsbescheid
+        and Musterzahlträger.
+
+        - Beitragsbescheid: the recipient address and dateline share one
+          physical line ("Grögersweg 6 19.08.2024") - rewritten so the date
+          is discoverable via the standard 'Rechnungsdatum' trigger.
+        - Musterzahlträger: the payment slip's only date-bearing field is a
+          matriculation-number-prefixed "<Matrikelnummer> Sommersemester
+          2017"-style line, which carries no day component and no month
+          name - rewritten into a due date (Wintersemester -> 1 October of
+          the first listed year; Sommersemester -> 1 April of its year).
+        """
+        due_month = {'Wintersemester': '10', 'Sommersemester': '04'}
+        processed_lines = []
+
+        for line in lines:
+            replaced = line.replace('Grögersweg 6', 'Rechnungsdatum: ')
+            match = re.search(r'\b\d{6,8}\s+(Wintersemester|Sommersemester)\s+(\d{4})', replaced)
+            if match:
+                semester, year = match.groups()
+                replaced = f'01.{due_month[semester]}.{year}'
+            processed_lines.append(replaced)
+
+        return processed_lines

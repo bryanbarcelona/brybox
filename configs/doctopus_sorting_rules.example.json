@@ -73,5 +73,11 @@
     "triggers": ["Bus Company", "Boarding Pass"],
     "output_path": "Travel",
     "filename": "Bus Ticket"
+  },
+  "Semester Statement": {
+    "triggers": ["Semester Statement", "Payment Reference"],
+    "output_path": "University",
+    "filename": "Semester Statement",
+    "extra_pages": 1
   }
 }
