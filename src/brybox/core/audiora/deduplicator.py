@@ -1,11 +1,12 @@
-"""Content-based deduplication for audio files using embedded hash tags."""
+"""Content-based deduplication for audio files."""
 
 from pathlib import Path
 from typing import Protocol
 
-from brybox.core.audiora.metadata import AudioMetadataExtractor
-from brybox.exceptions.audio import AudioraFileOperationError, AudioraMetadataError
+from brybox.exceptions.audio import AudioraFileOperationError
 from brybox.utils.deduplicator import HashDeduplicator
+from brybox.utils.health_check import is_audio_healthy
+from brybox.utils.logging import log_and_display
 
 
 class DeduplicatorProtocol(Protocol):
@@ -26,15 +27,31 @@ class ContentHashDeduplicator:
         self._scanned = False
 
     def _ensure_index(self) -> None:
+        """
+        Build the destination hash index.
+
+        Hashes every destination file directly - no cache is stored in the
+        files themselves, since embedding a hash in a file's own metadata
+        made every file's raw-byte hash unique to itself the moment it was
+        written, permanently defeating cross-file duplicate detection.
+
+        One unreadable file must never take down the whole scan - each file
+        is isolated so a single bad entry gets skipped (and logged) rather
+        than aborting `_scanned` before it's ever set, which would otherwise
+        force every subsequent file in the batch to re-run this full scan
+        from zero against the same bad file.
+        """
         if self._scanned:
             return
         for ext in ('*.m4a', '*.mp3', '*.flac', '*.wav'):
             for f in self.dest_root.rglob(ext):
-                h = AudioMetadataExtractor.read_content_hash(f)
-                if h is None:
-                    h = HashDeduplicator._hash_file(f)
-                    AudioMetadataExtractor.write_content_hash(f, h)
-                self._hashes.add(h)
+                if not is_audio_healthy(f):
+                    log_and_display(f'⚠️ Skipping unhealthy audio file during dedup index: {f}', level='warning')
+                    continue
+                try:
+                    self._hashes.add(HashDeduplicator._hash_file(f))
+                except OSError as e:
+                    log_and_display(f'⚠️ Skipping {f} during dedup index: {e}', level='warning')
         self._scanned = True
 
     def is_duplicate(self, source_path: Path) -> bool:
@@ -51,10 +68,6 @@ class ContentHashDeduplicator:
         """
         Check if two files have identical content via hash comparison.
 
-        Reads stored AUDIOHASH: Comment tag from destination if present to
-        avoid re-hashing. Falls back to hashing both files directly if no
-        tag exists (e.g. legacy files written before tagging was introduced).
-
         Args:
             file1: Source file path
             file2: Destination file path
@@ -69,27 +82,10 @@ class ContentHashDeduplicator:
             return False
 
         try:
-            dest_hash = AudioMetadataExtractor.read_content_hash(Path(file2))
-        except AudioraMetadataError:
-            dest_hash = None
-
-        try:
-            src_hash = HashDeduplicator._hash_file(Path(file1))
+            return HashDeduplicator._hash_file(Path(file1)) == HashDeduplicator._hash_file(Path(file2))
         except OSError as e:
             raise AudioraFileOperationError(
-                f'Failed to hash source file {file1}: {e}',
-                source_path=file1,
-                dest_path=file2,
-            ) from e
-
-        if dest_hash:
-            return src_hash == dest_hash
-
-        try:
-            return src_hash == HashDeduplicator._hash_file(Path(file2))
-        except OSError as e:
-            raise AudioraFileOperationError(
-                f'Failed to hash destination file {file2}: {e}',
+                f'Failed to hash {file1} or {file2}: {e}',
                 source_path=file1,
                 dest_path=file2,
             ) from e
