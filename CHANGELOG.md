@@ -1,3 +1,21 @@
+## v0.10.0 (2026-08-10)
+
+### Feat
+
+- **doctopus**: support per-category multi-page extraction
+- **amazon**: add Amazon.de invoice scraper with TOTP auth
+- **zip_warden**: add ZIP archive extraction and staging normalization
+- **dedup**: hash JPEG content only, ignoring EXIF/GPS/XMP metadata
+
+### Fix
+
+- **audiora**: remove self-poisoning content-hash cache, add health guard
+- **ci**: resolve ruff and ty check failures blocking CI
+- **utils**: treat misidentified image formats as healthy via size fallback
+- **web_marionette**: make Techem PDF download button selector resilient
+- **snap_jedi**: correct GPS parsing and drop double timezone offset
+- **logging**: disable Rich's legacy Windows console renderer
+
 ## v0.9.0 (2026-05-19)
 
 ### Feat
