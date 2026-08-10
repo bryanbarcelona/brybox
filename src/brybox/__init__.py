@@ -13,6 +13,7 @@ from brybox.core.inbox_kraken.engine import InboxKraken
 from brybox.core.porter import push_photos, push_videos
 from brybox.core.snap_jedi import SnapJedi
 from brybox.core.videosith import VideoSith
+from brybox.core.zip_warden import ZipWarden, ZipWardenNexus
 from brybox.events.verifier import DirectoryVerifier
 from brybox.utils.logging import configure_logging, enable_verbose_logging, log_and_display, log_manager, trackerator
 from brybox.utils.settings import BryboxSettings
@@ -34,6 +35,8 @@ __all__ = [
     'InboxKraken',
     'SnapJedi',
     'VideoSith',
+    'ZipWarden',
+    'ZipWardenNexus',
     'configure_logging',
     'enable_verbose_logging',
     'log_and_display',
