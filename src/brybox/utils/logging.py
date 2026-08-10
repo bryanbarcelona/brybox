@@ -94,7 +94,7 @@ class ConsoleLogger:
     """Thin façade: progress + optional sticky messages."""
 
     def __init__(self) -> None:
-        self.console = Console()
+        self.console = Console(legacy_windows=False)
         self._progress: Progress | None = None
         self._task: TaskID | None = None
         # --- explicit wiring point ----------------------------------------- #
