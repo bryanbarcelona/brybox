@@ -159,10 +159,13 @@ class MetadataReader:
         Returns:
             Tuple of (latitude, longitude, altitude). Returns (0, 0, 0) if not found.
         """
+
         def _safe_float(val: object) -> float:
+            if not isinstance(val, (str, int, float)):
+                return 0.0
             try:
-                return float(val)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
+                return float(val)
+            except ValueError:
                 return 0.0
 
         latitude = _safe_float(raw_exif.get('Composite:GPSLatitude', 0))

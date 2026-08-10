@@ -124,7 +124,7 @@ class AmazonScraper(BaseScraper):
         """Return True if navigating to the account home does not redirect to signin."""
         try:
             page.goto(self.ACCOUNT_HOME_URL, wait_until='domcontentloaded', timeout=15000)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             return False
         else:
             return 'signin' not in page.url
@@ -199,7 +199,7 @@ class AmazonScraper(BaseScraper):
 
         return self._build_result(total_found=total_found, downloaded=total_downloaded, errors=all_errors)
 
-    def _fetch_by_ids(self, page: Page, context: BrowserContext) -> DownloadResult:  # noqa: ARG002
+    def _fetch_by_ids(self, page: Page, context: BrowserContext) -> DownloadResult:  # ruff: ignore[unused-method-argument]
         """Download invoices for a specific list of order IDs (targeted/InboxKraken mode)."""
         assert self.order_ids is not None  # guaranteed by _run()
         errors: list[str] = []
@@ -214,7 +214,10 @@ class AmazonScraper(BaseScraper):
         return self._build_result(total_found=len(self.order_ids), downloaded=downloaded, errors=errors)
 
     def _scrape_year(
-        self, page: Page, context: BrowserContext, year: int  # noqa: ARG002
+        self,
+        page: Page,
+        context: BrowserContext,  # ruff: ignore[unused-method-argument]
+        year: int,
     ) -> tuple[int, int, list[str]]:
         """Paginate through all orders for a given year and download each invoice."""
         order_ids: list[str] = []
@@ -287,7 +290,7 @@ class AmazonScraper(BaseScraper):
         except PlaywrightTimeoutError:
             log_and_display(f'Order {order_id}: timeout loading invoice page', level='warning', log=True, sticky=False)
             return False
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # ruff: ignore[blind-except]
             log_and_display(f'Order {order_id}: unexpected error — {e}', level='warning', log=True, sticky=False)
             return False
 
@@ -295,9 +298,7 @@ class AmazonScraper(BaseScraper):
         log_and_display(f'Downloaded: {output_path.name} ({len(body)} bytes)', log=True, sticky=False)
         return True
 
-    def _navigate_invoice_page(
-        self, page: Page, order_id: str, invoice_url: str, default_path: Path
-    ) -> Path:
+    def _navigate_invoice_page(self, page: Page, order_id: str, invoice_url: str, default_path: Path) -> Path:
         """Navigate to the invoice print URL and return the resolved output path.
 
         Raises:
@@ -353,6 +354,6 @@ class AmazonScraper(BaseScraper):
             if match:
                 day, month, year_str = match.group(1), match.group(2), match.group(3)
                 return f'{year_str}-{month.zfill(2)}-{day.zfill(2)}'
-        except Exception:  # noqa: BLE001, S110
+        except Exception:  # ruff: ignore[blind-except, try-except-pass]
             pass
         return None

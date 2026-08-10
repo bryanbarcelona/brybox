@@ -87,7 +87,7 @@ class EventBus:
         for handler in handlers:
             try:
                 handler(event)
-            except Exception:  # noqa: BLE001,S112
+            except Exception:  # ruff: ignore[blind-except, try-except-continue]
                 continue
 
     def get_subscriber_count(self, event_type: type[EventType]) -> int:

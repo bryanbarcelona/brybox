@@ -180,7 +180,7 @@ class AppleSidecarManager:
                 log_and_display(f'Sidecar already deleted: {sidecar.name}', level='info')
             except (PermissionError, OSError) as e:
                 log_and_display(f'Cannot delete sidecar {sidecar.name}: {e}', level='warning')
-            except Exception as e:  # noqa: BLE001 - Batch operation, don't let one failure stop others
+            except Exception as e:  # ruff: ignore[blind-except] - Batch operation, don't let one failure stop others
                 log_and_display(f'Unexpected error deleting sidecar {sidecar.name}: {e}', level='error')
 
         return deleted
@@ -223,7 +223,7 @@ class AppleSidecarManager:
                 log_and_display(f'Sidecar already deleted: {sidecar.name}', level='info')
             except (PermissionError, OSError) as e:
                 log_and_display(f'Cannot delete sidecar {sidecar.name}: {e}', level='warning')
-            except Exception as e:  # noqa: BLE001 - Batch operation, don't let one failure stop others
+            except Exception as e:  # ruff: ignore[blind-except] - Batch operation, don't let one failure stop others
                 log_and_display(f'Unexpected error deleting sidecar {sidecar.name}: {e}', level='error')
 
         # Delete primary image
@@ -238,7 +238,7 @@ class AppleSidecarManager:
             log_and_display(f'Image already deleted: {image_path.name}', level='info')
         except (PermissionError, OSError) as e:
             log_and_display(f'Cannot delete image {image_path.name}: {e}', level='warning')
-        except Exception as e:  # noqa: BLE001 - Don't let image failure hide sidecar results
+        except Exception as e:  # ruff: ignore[blind-except] - Don't let image failure hide sidecar results
             log_and_display(f'Unexpected error deleting image {image_path.name}: {e}', level='error')
 
         return deleted

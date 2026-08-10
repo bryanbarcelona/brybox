@@ -154,7 +154,7 @@ class KfwScraper(BaseScraper):
             except ScraperError:
                 # These should bubble up to the handler
                 raise
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # ruff: ignore[blind-except]
                 # Unexpected errors in the download process
                 error_msg = f'Document {index}: {e!s}'
                 log_and_display(error_msg, level='warning', log=True, sticky=False)

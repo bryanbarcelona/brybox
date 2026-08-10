@@ -122,7 +122,7 @@ class InboxKraken:
                 self._process_single_email(uid)
             except InboxKrakenError as e:
                 log_and_display(f'⚠️ UID {uid} processing skipped: {e}', level='WARNING')
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # ruff: ignore[blind-except]
                 log_and_display(f'❌ Unexpected error on UID {uid}: {e}', level='ERROR')
 
     def preview(

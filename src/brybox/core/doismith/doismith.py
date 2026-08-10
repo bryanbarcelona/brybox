@@ -267,7 +267,7 @@ class DoiSmithNexus:
                 result['error'] = str(e)
                 log_and_display(f'⚙️  Configuration error: {e}', level='error')
 
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # ruff: ignore[blind-except]
                 result['error'] = f'Unexpected error: {e}'
                 log_and_display(f'💥 Unexpected error for {pdf_file.name}: {e}', level='error')
 

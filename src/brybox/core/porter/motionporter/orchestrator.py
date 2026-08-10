@@ -15,7 +15,7 @@ logger = get_configured_logger('MotionPorter')
 def _get_default_processor() -> type | None:
     """Lazy-load VideoSith as default processor."""
     try:
-        from brybox.core.videosith.videosith import VideoSith  # noqa: PLC0415
+        from brybox.core.videosith.videosith import VideoSith  # ruff: ignore[import-outside-top-level]
 
     except ImportError:
         log_and_display('VideoSith not available, files will be moved as-is', level='warning')
@@ -27,7 +27,7 @@ def _get_default_processor() -> type | None:
 def _get_default_deduplicator() -> Any | None:
     """Lazy-load HashDeduplicator as default."""
     try:
-        from brybox.utils.deduplicator import HashDeduplicator  # noqa: PLC0415
+        from brybox.utils.deduplicator import HashDeduplicator  # ruff: ignore[import-outside-top-level]
 
         return HashDeduplicator()
     except ImportError:
@@ -91,7 +91,7 @@ def push_videos(
         source=source,
         target=target,
         file_filter=file_filter,
-        processor_class=processor_class,
+        processor_class=processor_class,  # ty: ignore[invalid-argument-type]
         deduplicator=deduplicator,
         metadata_fixer=None,  # Videos don't need timestamp fixing yet
         migrate_sidecars=migrate_sidecars,

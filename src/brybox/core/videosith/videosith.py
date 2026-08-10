@@ -183,7 +183,7 @@ class VideoSith:
         except VideoSithError as e:
             # Expected domain errors - already logged at point of occurrence
             return ProcessResult(success=False, target_path=file_path, is_healthy=False, error_message=str(e))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # ruff: ignore[blind-except]
             # Unexpected errors - log with traceback
             log_and_display(f'💥 Unexpected error processing {file_path.name}: {e}', level='error')
             traceback.print_exc()
@@ -256,7 +256,7 @@ class VideoSith:
         except VideoSithError as e:
             # Expected domain errors - already logged
             return ProcessResult(success=False, target_path=file_path, is_healthy=False, error_message=str(e))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # ruff: ignore[blind-except]
             # Unexpected errors - log with traceback
             log_and_display(f'💥 Unexpected error processing {file_path.name}: {e}', level='error')
             traceback.print_exc()

@@ -3,6 +3,10 @@ import struct
 from collections import defaultdict
 from pathlib import Path
 
+from brybox.utils.logging import get_configured_logger
+
+logger = get_configured_logger('Deduplicator')
+
 _JPEG_SOI = b'\xff\xd8'
 _JPEG_APP_RANGE = range(0xE0, 0xF0)  # 0xFFE0–0xFFEF
 _JPEG_COMMENT = 0xFE
@@ -73,8 +77,8 @@ class HashDeduplicator:
         if path.suffix.lower() in {'.jpg', '.jpeg'}:
             try:
                 return HashDeduplicator._jpeg_content_hash(path)
-            except Exception:
-                pass
+            except (ValueError, struct.error, OSError):
+                logger.debug('JPEG content hash failed for %s, falling back to full-file hash', path.name)
         return HashDeduplicator._hash_file(path)
 
     @staticmethod
@@ -82,7 +86,7 @@ class HashDeduplicator:
         """
         Hash JPEG content from the first non-APP marker onwards.
 
-        Skips all APP segments (0xFFE0–0xFFEF) which contain EXIF, GPS, XMP,
+        Skips all APP segments (0xFFE0-0xFFEF) which contain EXIF, GPS, XMP,
         and C2PA metadata. Everything from DQT onwards (quantization tables,
         Huffman tables, frame header, compressed scan data) is hashed — this
         portion is identical between copies of the same photo regardless of
@@ -108,7 +112,7 @@ class HashDeduplicator:
                 break
             marker = data[pos + 1]
             if marker in _JPEG_APP_RANGE or marker == _JPEG_COMMENT:
-                length = struct.unpack('>H', data[pos + 2:pos + 4])[0]
+                length = struct.unpack('>H', data[pos + 2 : pos + 4])[0]
                 pos += 2 + length
             else:
                 break

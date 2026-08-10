@@ -131,7 +131,7 @@ class SnapJedi:
         # Steps 5-10: Generate target, handle duplicates, rename, cleanup
         try:
             return self._execute_post_conversion_steps()
-        except Exception as e:  # noqa
+        except Exception as e:  # ruff: ignore[blind-except]
             if isinstance(e, SnapJediError):
                 log_and_display(f'❌ SnapJedi error: {e}', level='error')
             else:
@@ -198,12 +198,10 @@ class SnapJedi:
         file_path = self._ensure_file_path()
 
         creation_date = self._metadata.creation_date if self._metadata else None
-        time_offset = self._metadata.time_offset if self._metadata else None
 
         target_path = PathStrategy.generate_target_path(
             file_path,
             creation_date,
-            time_offset,
         )
 
         self._target_path = target_path

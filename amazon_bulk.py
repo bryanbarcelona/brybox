@@ -80,8 +80,7 @@ def main() -> None:
         log_and_display(f'Complete: {result.downloaded}/{result.total_found} invoices downloaded')
     else:
         log_and_display(
-            f'Finished with issues: {result.downloaded}/{result.total_found} downloaded, '
-            f'{result.failed} failed',
+            f'Finished with issues: {result.downloaded}/{result.total_found} downloaded, {result.failed} failed',
             level='warning',
         )
         for error in result.errors:

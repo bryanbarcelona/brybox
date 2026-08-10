@@ -178,7 +178,7 @@ class NormalizationEngine:
 
             entry_b = index_b[key]
             action_a = (row_a.get('action') or '').upper()
-            action_b = (entry_b.get('action') or '').upper()  # noqa: F841 — reserved for future asymmetric action handling
+            action_b = (entry_b.get('action') or '').upper()  # ruff: ignore[unused-variable] — reserved for future asymmetric action handling
             has_conditions = any(row_a.get(f) for f in ('subject', 'has_pdf_attachment', 'embedded_link'))
 
             if action_a == 'DELETE' and not has_conditions:

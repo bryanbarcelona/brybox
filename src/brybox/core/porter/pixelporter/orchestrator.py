@@ -16,7 +16,7 @@ logger = get_configured_logger('PixelPorter')
 def _get_default_processor() -> type | None:
     """Lazy-load SnapJedi as default processor."""
     try:
-        from brybox.core.snap_jedi.snapjedi import SnapJedi  # noqa: PLC0415
+        from brybox.core.snap_jedi.snapjedi import SnapJedi  # ruff: ignore[import-outside-top-level]
 
     except ImportError:
         log_and_display('SnapJedi not available, files will be moved as-is', level='warning')
@@ -28,7 +28,7 @@ def _get_default_processor() -> type | None:
 def _get_default_deduplicator() -> Any | None:
     """Lazy-load HashDeduplicator as default."""
     try:
-        from brybox.utils.deduplicator import HashDeduplicator  # noqa: PLC0415
+        from brybox.utils.deduplicator import HashDeduplicator  # ruff: ignore[import-outside-top-level]
 
         return HashDeduplicator()
     except ImportError:
@@ -113,7 +113,7 @@ def push_photos(
         source=source,
         target=target,
         file_filter=file_filter,
-        processor_class=processor_class,
+        processor_class=processor_class,  # ty: ignore[invalid-argument-type]
         deduplicator=deduplicator,
         metadata_fixer=metadata_fixer,
         migrate_sidecars=migrate_sidecars,

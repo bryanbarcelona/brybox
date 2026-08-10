@@ -145,7 +145,7 @@ class GothaerScraper(BaseScraper):
                     errors.append(f'Item {index + 1}: no PDF downloaded')
             except ScraperError:
                 raise
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # ruff: ignore[blind-except]
                 error_msg = f'Item {index + 1}: {e!s}'
                 log_and_display(error_msg, level='warning', log=True, sticky=False)
                 errors.append(error_msg)
@@ -289,13 +289,13 @@ class GothaerScraper(BaseScraper):
                 page.goto(self.POSTBOX_URL)
 
             page.wait_for_selector('.webmailer__list', state='visible', timeout=10000)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             # Best-effort recovery - if we can't get back to the list the next
             # iteration will fail and be recorded as an error
             try:
                 page.goto(self.POSTBOX_URL)
                 page.wait_for_selector('.webmailer__list', state='visible', timeout=10000)
-            except Exception:  # noqa: BLE001, S110
+            except Exception:  # ruff: ignore[blind-except, try-except-pass]
                 pass
 
     @staticmethod
@@ -314,5 +314,5 @@ class GothaerScraper(BaseScraper):
                     btn.click()
                     page.wait_for_timeout(1000)
                     return
-        except Exception:  # noqa: BLE001,S110
+        except Exception:  # ruff: ignore[blind-except, try-except-pass]
             pass

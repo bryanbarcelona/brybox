@@ -11,38 +11,33 @@ class PathStrategy:
     """
 
     @staticmethod
-    def generate_target_path(source_path: Path, creation_date: datetime | None, time_offset: int | None = None) -> Path:
+    def generate_target_path(source_path: Path, creation_date: datetime | None) -> Path:
         """
         Generate target path for an image based on its metadata.
 
         Priority:
-        1. If creation_date + time_offset exist: use adjusted timestamp
-        2. If only creation_date exists: use as-is timestamp
-        3. Otherwise: keep original filename, change to .jpg
+        1. If creation_date exists: use its timestamp as-is
+        2. Otherwise: keep original filename, change to .jpg
 
         Args:
             source_path: Original image path
-            creation_date: Image creation timestamp (naive datetime)
-            time_offset: Timezone offset in hours (e.g., -5 for EST)
+            creation_date: Image creation timestamp (naive datetime, local per EXIF standard)
 
         Returns:
             Target path with timestamp-based filename or original name
 
         Example:
-            >>> PathStrategy.generate_target_path(
-            ...     Path('IMG_1234.HEIC'), datetime(2024, 3, 15, 14, 30, 0), time_offset=-5
-            ... )
-            Path("20240315 093000.jpg")
+            >>> PathStrategy.generate_target_path(Path('IMG_1234.HEIC'), datetime(2024, 3, 15, 14, 30, 0))
+            Path("20240315 143000.jpg")
         """
         directory = source_path.parent
 
-        # DateTimeOriginal is always local time per EXIF standard — use directly.
-        # time_offset is timezone metadata only, never added to the datetime value.
+        # DateTimeOriginal is always local time per EXIF standard - use directly.
         if creation_date is not None:
             base_filename = creation_date.strftime('%Y%m%d %H%M%S')
             target = directory / f'{base_filename}.jpg'
 
-        # Case 3: No metadata - keep original name, change extension
+        # Case 2: No metadata - keep original name, change extension
         else:
             target = source_path.with_suffix('.jpg')
 

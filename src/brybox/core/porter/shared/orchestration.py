@@ -219,7 +219,7 @@ def _run_processing_phase(
         log_and_display(f'❌ Processing phase failed: {e}', level='error')
         result.failed += 1
         result.errors.append(str(e))
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # ruff: ignore[blind-except]
         log_and_display(f'❌ Unexpected error during processing phase: {e}', level='error')
         result.failed += 1
         result.errors.append(f'Unexpected: {e}')

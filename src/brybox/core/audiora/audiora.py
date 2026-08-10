@@ -332,7 +332,7 @@ class AudioraNexus:
             except AudioraError as e:
                 result['error'] = str(e)
 
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # ruff: ignore[blind-except]
                 result['error'] = f'Unexpected: {e}'
                 log_and_display(f'💥 Unexpected error for {audio_file.name}: {e}', level='error')
 
