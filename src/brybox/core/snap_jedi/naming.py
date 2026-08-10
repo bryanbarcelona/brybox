@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 
@@ -36,14 +36,9 @@ class PathStrategy:
         """
         directory = source_path.parent
 
-        # Case 1: Have both date and offset - apply timezone adjustment
-        if creation_date is not None and time_offset is not None:
-            adjusted_date = creation_date + timedelta(hours=time_offset)
-            base_filename = adjusted_date.strftime('%Y%m%d %H%M%S')
-            target = directory / f'{base_filename}.jpg'
-
-        # Case 2: Have date but no offset - use as-is
-        elif creation_date is not None:
+        # DateTimeOriginal is always local time per EXIF standard — use directly.
+        # time_offset is timezone metadata only, never added to the datetime value.
+        if creation_date is not None:
             base_filename = creation_date.strftime('%Y%m%d %H%M%S')
             target = directory / f'{base_filename}.jpg'
 
