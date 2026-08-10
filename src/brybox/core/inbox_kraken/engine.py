@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from brybox.core.inbox_kraken.classifier import EmailClassifier, Tag
 from brybox.core.inbox_kraken.fetcher import EmailFetcher
 from brybox.core.inbox_kraken.handlers import (
+    amazon_handler,
     delete_handler,
     download_attachment_handler,
     download_pdf_handler,
@@ -95,6 +96,7 @@ class InboxKraken:
             Tag.TECHEM: techem_handler,
             Tag.KFW: kfw_handler,
             Tag.GOTHAER: gothaer_handler,
+            Tag.AMAZON: amazon_handler,
             Tag.MANUAL_CLICK: manual_click_handler,
             Tag.IGNORE: ignore_handler,
             Tag.DELETE: delete_handler,

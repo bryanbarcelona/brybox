@@ -33,6 +33,9 @@ class WebCredentials:
     kfw_password: str | None = None
     gothaer_user: str | None = None
     gothaer_password: str | None = None
+    amazon_user: str | None = None
+    amazon_password: str | None = None
+    amazon_totp_secret: str | None = None
 
 
 class CredentialsManager:
@@ -65,4 +68,7 @@ class CredentialsManager:
             kfw_password=os.getenv('KFW_PWD'),
             gothaer_user=os.getenv('USER_GOTHAER'),
             gothaer_password=os.getenv('GOTHAER_PWD'),
+            amazon_user=os.getenv('USER_AMAZON'),
+            amazon_password=os.getenv('AMAZON_PWD'),
+            amazon_totp_secret=os.getenv('AMAZON_TOTP_SECRET'),
         )

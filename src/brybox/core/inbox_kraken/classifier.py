@@ -18,6 +18,7 @@ class Tag(Enum):
     TECHEM = auto()
     KFW = auto()
     GOTHAER = auto()
+    AMAZON = auto()
 
 
 class EmailClassifier:

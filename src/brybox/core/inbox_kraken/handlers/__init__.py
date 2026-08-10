@@ -2,9 +2,10 @@ from .attachment import download_attachment_handler
 from .dropbox import dropbox_audio_handler
 from .misc import delete_handler, ignore_handler, manual_click_handler
 from .pdf_link import download_pdf_handler
-from .scrapers import gothaer_handler, kfw_handler, techem_handler
+from .scrapers import amazon_handler, gothaer_handler, kfw_handler, techem_handler
 
 __all__ = [
+    'amazon_handler',
     'delete_handler',
     'download_attachment_handler',
     'download_pdf_handler',
