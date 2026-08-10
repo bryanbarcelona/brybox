@@ -1,5 +1,6 @@
 import datetime
 import logging
+import re
 from pathlib import Path
 
 from playwright.sync_api import (
@@ -150,15 +151,22 @@ class TechemScraper(BaseScraper):
     @staticmethod
     def _download_pdf(page: Page, output_path: Path) -> None:
         """Download the PDF invoice."""
-        # Try multiple possible button names
-        pdf_button = page.get_by_role('button', name='PDF herunterladen').or_(
-            page.get_by_role('button', name='Download')
+        # Compile text patterns for multi-language support
+        download_pattern = re.compile(r'^(PDF herunterladen|Download)$', re.IGNORECASE)
+
+        # Primary target: data-testid (immune to tag/label changes)
+        # Fallbacks: role="button" or role="link" matching label texts
+        pdf_target = (
+            page
+            .get_by_test_id('consumptions-overview-pdf-download-action')
+            .or_(page.get_by_role('button', name=download_pattern))
+            .or_(page.get_by_role('link', name=download_pattern))
         )
 
-        pdf_button.wait_for(state='visible', timeout=15000)
+        pdf_target.wait_for(state='visible', timeout=15000)
 
         with page.expect_download() as download_info:
-            pdf_button.click()
+            pdf_target.click()
 
         download = download_info.value
         download.save_as(str(output_path))
