@@ -3,7 +3,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pdfplumber
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 # --- Specific file-type health checks ---
 
@@ -30,8 +30,12 @@ def is_image_healthy(file_path: str | Path) -> bool:
 
     try:
         with Image.open(file_path) as img:
-            img.verify()
-    except Exception:  # noqa: BLE001 - Any error means unhealthy, caller doesn't need specifics
+            _ = img.size  # reads header without strict full-content verification
+    except UnidentifiedImageError:
+        # Pillow doesn't recognise the format (e.g. HEIC with .jpg extension) —
+        # the file is not corrupt, just misidentified; fall back to size check.
+        return file_path.stat().st_size > 0
+    except Exception:  # noqa: BLE001
         return False
     else:
         return True
