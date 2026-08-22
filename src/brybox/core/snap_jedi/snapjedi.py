@@ -62,15 +62,18 @@ class SnapJedi:
         self._target_path: Path | None = None
         self._metadata: ImageMetadata | None = None
         self._is_healthy: bool = False
+        self._original_name: str | None = None
 
-    def open(self, file_path: Path) -> None:
+    def open(self, file_path: Path, original_name: str | None = None) -> None:
         """
         Open file for processing.
 
         Performs basic validation but does not read metadata yet.
 
         Args:
-            file_path: Path to image file to process
+            file_path: Path to image file to process (may be a staged temp copy)
+            original_name: Filename the source had before staging, if known. Used
+                as the target filename when no creation-date metadata is available.
 
         Raises:
             FileNotFoundError: If file doesn't exist
@@ -85,6 +88,7 @@ class SnapJedi:
             raise SnapJediFileOperationError(f'Not a file: {file_path}', source_path=file_path)
 
         self._file_path = file_path
+        self._original_name = original_name
         log_and_display(f'Opened file: {file_path.name}', log=False)
 
     def _ensure_file_path(self) -> Path:
@@ -199,15 +203,20 @@ class SnapJedi:
 
         creation_date = self._metadata.creation_date if self._metadata else None
 
+        # Check the un-numbered base path for a true content-duplicate first -
+        # generate_target_path() would otherwise number past it and hide it.
+        base_target = PathStrategy.compute_base_target(file_path, creation_date, self._original_name)
+        if base_target.exists() and base_target != file_path and self._are_files_identical(file_path, base_target):
+            self._target_path = base_target
+            return self._handle_duplicate(file_path, base_target)
+
         target_path = PathStrategy.generate_target_path(
             file_path,
             creation_date,
+            fallback_name=self._original_name,
         )
 
         self._target_path = target_path
-
-        if target_path.exists() and target_path != file_path and self._are_files_identical(file_path, target_path):
-            return self._handle_duplicate(file_path, target_path)
 
         return None
 

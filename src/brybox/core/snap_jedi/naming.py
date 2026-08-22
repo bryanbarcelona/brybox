@@ -11,17 +11,23 @@ class PathStrategy:
     """
 
     @staticmethod
-    def generate_target_path(source_path: Path, creation_date: datetime | None) -> Path:
+    def generate_target_path(
+        source_path: Path, creation_date: datetime | None, fallback_name: str | None = None
+    ) -> Path:
         """
         Generate target path for an image based on its metadata.
 
         Priority:
         1. If creation_date exists: use its timestamp as-is
-        2. Otherwise: keep original filename, change to .jpg
+        2. Otherwise: keep the original filename (pre-staging, if known), change to .jpg
 
         Args:
-            source_path: Original image path
+            source_path: Path to the staged image being processed
             creation_date: Image creation timestamp (naive datetime, local per EXIF standard)
+            fallback_name: Filename the source had before staging, used when no
+                creation_date is available (e.g. WhatsApp-recompressed images that
+                have had their EXIF stripped). Falls back to source_path's own name
+                when not provided.
 
         Returns:
             Target path with timestamp-based filename or original name
@@ -30,19 +36,41 @@ class PathStrategy:
             >>> PathStrategy.generate_target_path(Path('IMG_1234.HEIC'), datetime(2024, 3, 15, 14, 30, 0))
             Path("20240315 143000.jpg")
         """
+        target = PathStrategy.compute_base_target(source_path, creation_date, fallback_name)
+        return PathStrategy._resolve_conflict(source_path, target)
+
+    @staticmethod
+    def compute_base_target(
+        source_path: Path, creation_date: datetime | None, fallback_name: str | None = None
+    ) -> Path:
+        """
+        Compute the desired target path without conflict resolution.
+
+        Callers that need to distinguish a true content-duplicate (same file,
+        same name) from a genuine naming collision (different files, same name)
+        must check this base path against the filesystem *before* calling
+        generate_target_path(), since that method already numbers past any
+        existing file and would otherwise mask a real duplicate.
+
+        Args:
+            source_path: Path to the staged image being processed
+            creation_date: Image creation timestamp (naive datetime, local per EXIF standard)
+            fallback_name: Filename the source had before staging, used when no
+                creation_date is available
+
+        Returns:
+            Desired target path, not yet checked against existing files
+        """
         directory = source_path.parent
 
         # DateTimeOriginal is always local time per EXIF standard - use directly.
         if creation_date is not None:
             base_filename = creation_date.strftime('%Y%m%d %H%M%S')
-            target = directory / f'{base_filename}.jpg'
+            return directory / f'{base_filename}.jpg'
 
-        # Case 2: No metadata - keep original name, change extension
-        else:
-            target = source_path.with_suffix('.jpg')
-
-        # Handle conflicts
-        return PathStrategy._resolve_conflict(source_path, target)
+        # Case 2: No metadata - keep the pre-staging original name, change extension
+        name = fallback_name if fallback_name is not None else source_path.name
+        return directory / Path(name).with_suffix('.jpg')
 
     @staticmethod
     def _resolve_conflict(source_path: Path, target_path: Path) -> Path:

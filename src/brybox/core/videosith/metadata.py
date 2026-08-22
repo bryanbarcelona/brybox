@@ -51,9 +51,14 @@ class MetadataReader:
         self.exiftool_path = exiftool_path or self._find_exiftool()
         self.timezone_finder = TimezoneFinder()
 
-    def extract_metadata(self, file_path: Path) -> VideoMetadata:
+    def extract_metadata(self, file_path: Path, original_name: str | None = None) -> VideoMetadata:
         """
         Extract all metadata from a video file.
+
+        Args:
+            file_path: Path to the video file to read (may be a staged temp copy)
+            original_name: Filename the source had before staging, if known. Used
+                to recover a local-time hint when GPS-based timezone lookup fails.
 
         Returns:
             VideoMetadata (may be partial - None fields indicate missing data)
@@ -74,7 +79,7 @@ class MetadataReader:
         creation_date = self._extract_creation_date(raw_exif, file_path)
         gps_lat, gps_lon, gps_alt = self._extract_gps_coordinates(raw_exif)
         timezone = self._calculate_timezone(gps_lat, gps_lon, gps_alt, file_path)
-        parsed_filename_date = self._parse_date_from_filename(file_path)
+        parsed_filename_date = self._parse_date_from_filename(file_path, original_name)
         time_offset = self._determine_time_offset(timezone, creation_date, parsed_filename_date, file_path)
 
         return VideoMetadata(
@@ -171,16 +176,16 @@ class MetadataReader:
             ) from e
 
     @staticmethod
-    def _parse_date_from_filename(file_path: Path) -> datetime | None:
-        """Parse date from filename if present."""
-        filename = file_path.stem
-        date_match = re.search(r'\d{8}_\d{6}', filename)
+    def _parse_date_from_filename(file_path: Path, original_name: str | None = None) -> datetime | None:
+        """Parse date from filename if present. Prefers original_name over a staged temp name."""
+        filename = Path(original_name).stem if original_name is not None else file_path.stem
+        date_match = re.search(r'(\d{8})[_ ](\d{6})', filename)
 
         if not date_match:
             return None
 
         try:
-            return datetime.strptime(date_match.group(), '%Y%m%d_%H%M%S')
+            return datetime.strptime(f'{date_match.group(1)}_{date_match.group(2)}', '%Y%m%d_%H%M%S')
         except ValueError as e:
             raise VideoSithFilenameParseError(
                 f'Failed to parse date from filename: {filename}', video_path=file_path, filename=filename

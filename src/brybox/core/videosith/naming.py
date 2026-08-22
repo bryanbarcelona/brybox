@@ -52,19 +52,24 @@ class PathStrategy:
             target = source_path.with_suffix('.mp4')
 
         # Handle conflicts
-        return PathStrategy._resolve_conflict(target)
+        return PathStrategy._resolve_conflict(source_path, target)
 
     @staticmethod
-    def _resolve_conflict(target_path: Path) -> Path:
+    def _resolve_conflict(source_path: Path, target_path: Path) -> Path:
         """
         Resolve filename conflicts by adding (1), (2), etc.
 
         Args:
+            source_path: Path being processed, to detect a same-file non-conflict
             target_path: Desired target path
 
         Returns:
             Conflict-free target path
         """
+        # If target equals source, no rename needed
+        if target_path == source_path:
+            return target_path
+
         # If target doesn't exist, we're good
         if not target_path.exists():
             return target_path

@@ -21,12 +21,15 @@ class PorterResult:
 class FileProcessor(Protocol):
     """Interface for file processors like SnapJedi."""
 
-    def open(self, file_path: Path) -> None:
+    def open(self, file_path: Path, original_name: str | None = None) -> None:
         """
         Open and prepare the file for processing.
 
         Args:
-            file_path: Path to the file to open
+            file_path: Path to the file to open (may be a staged temp copy)
+            original_name: Filename the source had before staging, if known.
+                Implementations may use this as a fallback identifier when
+                no timestamp metadata is available.
         """
         ...
 

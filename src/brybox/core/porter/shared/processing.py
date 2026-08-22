@@ -74,7 +74,7 @@ def _process_single_file(
     """
     try:
         processor = processor_class()
-        processor.open(temp_image_path)
+        processor.open(temp_image_path, original_name=source_path.name)
 
         process_result: ProcessResult = processor.process()
         _handle_processor_result(source_path, temp_image_path, process_result, result)

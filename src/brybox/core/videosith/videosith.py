@@ -63,6 +63,7 @@ class VideoSith:
         self._file_path: Path | None = None
         self._metadata: VideoMetadata | None = None
         self._is_healthy: bool = False
+        self._original_name: str | None = None
 
     def _ensure_file_path(self) -> Path:
         """Ensure file_path is set and return it."""
@@ -70,12 +71,14 @@ class VideoSith:
             raise VideoSithFileOperationError('No file opened. Call open() first.')
         return self._file_path
 
-    def open(self, file_path: Path) -> None:
+    def open(self, file_path: Path, original_name: str | None = None) -> None:
         """
         Open file for processing.
 
         Args:
-            file_path: Path to video file to process
+            file_path: Path to video file to process (may be a staged temp copy)
+            original_name: Filename the source had before staging, if known. Used
+                to recover a local-time hint when GPS-based timezone lookup fails.
 
         Raises:
             VideoSithVideoNotFoundError: If file doesn't exist
@@ -90,6 +93,7 @@ class VideoSith:
             raise VideoSithFileOperationError(f'Not a file: {file_path}', source_path=file_path)
 
         self._file_path = file_path
+        self._original_name = original_name
         log_and_display(f'Opened file: {file_path.name}', log=False)
 
     def process(self) -> ProcessResult:
@@ -122,7 +126,7 @@ class VideoSith:
         try:
             # Step 1: Extract metadata from source
             try:
-                self._metadata = self._metadata_reader.extract_metadata(file_path)
+                self._metadata = self._metadata_reader.extract_metadata(file_path, original_name=self._original_name)
                 log_and_display(f'📷 Extracted metadata from {file_path.name}', log=False)
             except VideoSithMetadataReadError as e:
                 log_and_display(f'❌ Failed to read metadata from {file_path.name}: {e}', level='error')
@@ -198,7 +202,7 @@ class VideoSith:
         try:
             # Step 1: Extract metadata
             try:
-                self._metadata = self._metadata_reader.extract_metadata(file_path)
+                self._metadata = self._metadata_reader.extract_metadata(file_path, original_name=self._original_name)
                 log_and_display(f'📷 Extracted metadata from {file_path.name}', log=False)
             except VideoSithMetadataReadError as e:
                 log_and_display(f'❌ Failed to read metadata from {file_path.name}: {e}', level='error')
