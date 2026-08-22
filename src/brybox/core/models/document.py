@@ -21,6 +21,7 @@ class ProcessingContext:
     condensed_lines: list[str] = field(default_factory=list)
     document_date: str | None = None
     invoice_id: str | None = None
+    subject: str | None = None
     output_filename: str | None = None
     output_filepath: Path | None = None
     is_new_file: bool = True
@@ -48,6 +49,7 @@ class ProcessingContext:
         lines.append('-' * 20)
         lines.append(f'Document Date:   {self.document_date or "None"}')
         lines.append(f'Invoice ID:      {self.invoice_id or "None"}')
+        lines.append(f'Subject:         {self.subject or "None"}')
         lines.append(f'Output Filename: {self.output_filename or "None"}')
         lines.append(f'Output Path:     {self.output_filepath or "None"}')
         lines.append(f'Base Directory:  {self.base_dir}')

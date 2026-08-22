@@ -26,9 +26,11 @@ class PathBuilder:
         self.base_dir = base_dir
 
     @staticmethod
-    def build_filename(date: str | None, category: str | None, invoice_id: str | None) -> str:
+    def build_filename(
+        date: str | None, category: str | None, invoice_id: str | None, subject: str | None = None
+    ) -> str:
         """Assemble output filename from available metadata components."""
-        parts = [p for p in (date, category, invoice_id) if p]
+        parts = [p for p in (date, category, invoice_id, subject) if p]
         return f'{" ".join(parts).strip()}.pdf'
 
     @staticmethod

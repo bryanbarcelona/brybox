@@ -253,6 +253,52 @@ class SpecialCaseHandler:
 
         return lines
 
+    def extract_subject(self, category: str | None, raw_content: str) -> str | None:
+        """
+        Dispatch to category-specific subject extraction, returning None if
+        none applies.
+
+        Separate from handle_special_cases() because a subject line typically
+        cannot survive reduce_to_relevant_lines' filtering (no month name, no
+        matching extraction trigger) - these handlers need the raw, pre-filter
+        content instead of the already-condensed lines.
+        """
+        if category == 'Techniker Krankenkasse':
+            return self._extract_techniker_subject(raw_content)
+
+        return None
+
+    @staticmethod
+    def _extract_techniker_subject(content: str) -> str | None:
+        """
+        Extract a Techniker Krankenkasse letter's subject/concern.
+
+        Tries two conventions found in this correspondence, in order:
+        1. An explicit subject label (Thema/Betreff/Betr/Subject/Re:).
+        2. The single line directly above a business-letter salutation
+           (DIN 5008 and common English equivalents), e.g. "Guten Tag Herr
+           X," or "Dear...". No attempt is made to join wrapped lines above
+           it - a short/incomplete fragment is preferred over risking an
+           unrelated line being pulled in.
+        """
+        subject_label_pattern = re.compile(r'(?:(?:thema|betreff|betr|subject)\s*[:.]?|re\s*:)\s*(.+)', re.IGNORECASE)
+        salutation_pattern = re.compile(r'(guten\s*tag|sehr\s*geehrte|hallo|dear|hello|hi)\b', re.IGNORECASE)
+
+        lines = content.split('\n')
+
+        for line in lines:
+            match = subject_label_pattern.match(line.strip())
+            if match and match.group(1).strip():
+                return match.group(1).strip()
+
+        for i, line in enumerate(lines):
+            if i > 0 and salutation_pattern.match(line.strip()):
+                subject = lines[i - 1].strip()
+                if subject:
+                    return subject
+
+        return None
+
     @staticmethod
     def _handle_bolt(lines: list[str]) -> list[str]:
         """

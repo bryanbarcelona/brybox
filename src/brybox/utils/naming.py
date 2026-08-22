@@ -5,7 +5,24 @@ Shared filename utilities.
 # TODO (videosith/naming.py): migrate PathStrategy._resolve_conflict here
 """
 
+import re
 from pathlib import Path
+
+_FORBIDDEN_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def sanitize_filename_component(text: str) -> str:
+    """
+    Strip characters forbidden in Windows filenames and collapse whitespace.
+
+    Args:
+        text: Free-text filename component (e.g. an extracted document subject).
+
+    Returns:
+        Text safe to embed in a filename.
+    """
+    cleaned = _FORBIDDEN_FILENAME_CHARS.sub('', text)
+    return re.sub(r'\s+', ' ', cleaned).strip()
 
 
 def resolve_filename_conflict(target_path: Path) -> Path:

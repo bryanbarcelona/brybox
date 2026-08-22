@@ -17,6 +17,7 @@ from brybox.exceptions.documents import (
     DoctopusPDFNotFoundError,
 )
 from brybox.utils.logging import get_configured_logger, log_and_display, trackerator
+from brybox.utils.naming import sanitize_filename_component
 from brybox.utils.settings import BryboxSettings
 
 logger = get_configured_logger('Doctopus')
@@ -85,9 +86,14 @@ class DoctopusPrime:
         if not context.category:
             log_and_display(f'⏸️ No category match: {self.pdf_filepath.name}', level='info')
         else:
-            extra_pages = self.config.get('categories', {}).get(context.category, {}).get('extra_pages', 0)
+            category_config = self.config.get('categories', {}).get(context.category, {})
+
+            extra_pages = category_config.get('extra_pages', 0)
             if extra_pages:
                 context.content = self.text_processor.extract_content(self.pdf_filepath, max_pages=1 + extra_pages)
+
+            subject = self.special_handler.extract_subject(context.category, context.content)
+            context.subject = sanitize_filename_component(subject) if subject else None
 
         context.condensed_lines = self.text_processor.reduce_to_relevant_lines(context.content)
         context.condensed_lines = self.special_handler.handle_special_cases(context.category, context.condensed_lines)
@@ -98,7 +104,7 @@ class DoctopusPrime:
         if context.category:
             filename_stem = self.path_builder.get_filename_component(context.category, self.config)
             context.output_filename = self.path_builder.build_filename(
-                context.document_date, filename_stem, context.invoice_id
+                context.document_date, filename_stem, context.invoice_id, context.subject
             )
             context.output_filepath = self.path_builder.build_output_path(
                 context.category, context.output_filename, self.config, self.pdf_filepath
