@@ -16,6 +16,11 @@ from brybox.utils.logging import get_configured_logger
 
 logger = get_configured_logger('Extraction')
 
+# A line whose *entire* content is a bare numeric date (no label, no
+# surrounding text) is unambiguous enough to treat like a month name -
+# always relevant, regardless of category.
+_SOLO_DATE_PATTERN = re.compile(r'^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$')
+
 
 class TextProcessor:
     """Handles PDF text extraction and line filtering."""
@@ -55,7 +60,7 @@ class TextProcessor:
         relevant_lines = []
 
         for i, line in enumerate(normalized_lines):
-            if self._contains_month(line):
+            if self._contains_month(line) or self._is_solo_date_line(line):
                 relevant_lines.append(line)
                 continue
 
@@ -66,7 +71,7 @@ class TextProcessor:
 
     def _get_rule_matches(self, line: str, index: int, all_lines: list[str], rules: dict) -> list[str]:
         """Helper to process all triggers for a single line to keep nesting low."""
-        matches = []
+        matches: list[str] = []
         for trigger_type, triggers in rules.items():
             for trigger in triggers:
                 if trigger not in line:
@@ -132,7 +137,14 @@ class TextProcessor:
         return any(m in line_lower for m in months)
 
     @staticmethod
-    def _apply_trigger_logic(trigger_type: str, trigger: str, line: str, index: int, all_lines: list[str]) -> Any:
+    def _is_solo_date_line(line: str) -> bool:
+        """Helper to check if a line's entire content is a bare numeric date."""
+        return bool(_SOLO_DATE_PATTERN.match(line.strip()))
+
+    @staticmethod
+    def _apply_trigger_logic(
+        trigger_type: str, trigger: str, line: str, index: int, all_lines: list[str]
+    ) -> str | list[str] | None:
         """Handles the specific 'trigger_type' logic for line filtering."""
         if trigger_type == '001_same_line':
             segment = f'{trigger}{line.rsplit(trigger, maxsplit=1)[-1]}'
