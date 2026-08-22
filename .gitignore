@@ -2,6 +2,9 @@
 .DS_Store
 Thumbs.db
 
+# Claude Code local settings (personal, machine-specific)
+.claude/settings.local.json
+
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -60,3 +63,4 @@ src/brybox/core/snap_jedi.py
 src/brybox/core/video_sith.py
 main.py
 first_run.py
+daily_ingest.py
