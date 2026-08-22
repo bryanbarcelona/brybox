@@ -2,7 +2,7 @@ import filecmp
 from pathlib import Path
 
 from brybox.core.models.image import ImageMetadata, ProcessResult
-from brybox.core.snap_jedi.converter import ImageMagickConverter
+from brybox.core.snap_jedi.converter import PillowHeifConverter
 from brybox.core.snap_jedi.metadata import MetadataReader
 from brybox.core.snap_jedi.naming import PathStrategy
 from brybox.events.bus import publish_file_deleted, publish_file_renamed
@@ -35,7 +35,7 @@ class SnapJedi:
     def __init__(
         self,
         metadata_reader: MetadataReader | None = None,
-        converter: ImageMagickConverter | None = None,
+        converter: PillowHeifConverter | None = None,
         sidecar_manager: AppleSidecarManager | None = None,
     ):
         """
@@ -47,11 +47,11 @@ class SnapJedi:
             sidecar_manager: Apple sidecar file handler (DI)
 
         Raises:
-            SnapJediToolNotFoundError: If required tools (exiftool/ImageMagick) are missing
+            SnapJediToolNotFoundError: If required tools (exiftool) are missing
         """
         try:
             self._metadata_reader = metadata_reader or MetadataReader()
-            self._converter = converter or ImageMagickConverter()
+            self._converter = converter or PillowHeifConverter()
         except SnapJediToolNotFoundError as e:
             log_and_display(f'🔧 Missing required tool: {e}', level='error')
             raise  # Fatal error - can't proceed
