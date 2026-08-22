@@ -1,3 +1,15 @@
+## v0.11.0 (2026-08-22)
+
+### Feat
+
+- **doctopus**: extract a subject/concern for Techniker Krankenkasse filings
+- **doctopus**: treat bare numeric date lines as always relevant
+- **porter**: preserve original filename through staging
+
+### Refactor
+
+- **snapjedi**: replace ImageMagick HEIC conversion with pillow-heif
+
 ## v0.10.0 (2026-08-10)
 
 ### Feat
